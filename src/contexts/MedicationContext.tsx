@@ -340,6 +340,40 @@ export const MedicationProvider = ({ children }: MedicationProviderProps) => {
       .reduce((total, item) => total + item.quantity, 0);
   };
 
+  // Helper function to update stock levels
+  const updateStock = (itemId: string, itemType: 'medication' | 'utensil', locationId: string, quantityChange: number): void => {
+    const existingStockItem = stock.find(
+      item => item.itemId === itemId && item.itemType === itemType && item.locationId === locationId
+    );
+    
+    if (existingStockItem) {
+      // Update existing stock
+      setStock(prev => 
+        prev.map(item => 
+          item.id === existingStockItem.id
+            ? { 
+                ...item, 
+                quantity: Math.max(0, item.quantity + quantityChange),
+                updatedAt: new Date().toISOString() 
+              }
+            : item
+        )
+      );
+    } else if (quantityChange > 0) {
+      // Create new stock entry if it's an addition
+      const newStockItem: StockItem = {
+        id: uuidv4(),
+        itemId,
+        itemType,
+        locationId,
+        quantity: quantityChange,
+        updatedAt: new Date().toISOString(),
+      };
+      
+      setStock(prev => [...prev, newStockItem]);
+    }
+  };
+
   // Add a new stock transaction (receipt, distribution, etc.)
   const addStockTransaction = (
     transactionData: Omit<StockTransaction, 'id' | 'requestDate' | 'status' | 'requestedBy'>
@@ -444,125 +478,6 @@ export const MedicationProvider = ({ children }: MedicationProviderProps) => {
     }
   };
 
-  // Helper function to update stock levels
-  const updateStock = (itemId: string, itemType: 'medication' | 'utensil', locationId: string, quantityChange: number): void => {
-    const existingStockItem = stock.find(
-      item => item.itemId === itemId && item.itemType === itemType && item.locationId === locationId
-    );
-    
-    if (existingStockItem) {
-      // Update existing stock
-      setStock(prev => 
-        prev.map(item => 
-          item.id === existingStockItem.id
-            ? { 
-                ...item, 
-                quantity: Math.max(0, item.quantity + quantityChange),
-                updatedAt: new Date().toISOString() 
-              }
-            : item
-        )
-      );
-    } else if (quantityChange > 0) {
-      // Create new stock entry if it's an addition
-      const newStockItem: StockItem = {
-        id: uuidv4(),
-        itemId,
-        itemType,
-        locationId,
-        quantity: quantityChange,
-        updatedAt: new Date().toISOString(),
-      };
-      
-      setStock(prev => [...prev, newStockItem]);
-    }
-  };
-      updateStock(
-        transactionData.itemId,
-        transactionData.itemType,
-        transactionData.sourceLocationId,
-        -transactionData.quantity
-      );
-    }
-    
-    return newTransaction.id;
-  };
-
-  // Update the status of a transaction
-  const updateTransactionStatus = (
-    id: string, 
-    status: 'approved' | 'rejected' | 'completed',
-    processedBy: string
-  ): void => {
-    const transaction = transactions.find(t => t.id === id);
-    if (!transaction) return;
-    
-    const now = new Date().toISOString();
-    
-    setTransactions(prev => 
-      prev.map(t => 
-        t.id === id 
-          ? { ...t, status, processedBy, processDate: now } 
-          : t
-      )
-    );
-    
-    // If approved or completed, update stock levels
-    if (status === 'approved' || status === 'completed') {
-      if (transaction.sourceLocationId) {
-        updateStock(
-          transaction.itemId,
-          transaction.itemType,
-          transaction.sourceLocationId,
-          -transaction.quantity
-        );
-      }
-      
-      if (transaction.destinationLocationId) {
-        updateStock(
-          transaction.itemId,
-          transaction.itemType,
-          transaction.destinationLocationId,
-          transaction.quantity
-        );
-      }
-    }
-  };
-
-  // Helper function to update stock levels
-  const updateStock = (itemId: string, itemType: 'medication' | 'utensil', locationId: string, quantityChange: number): void => {
-    const existingStockItem = stock.find(
-      item => item.itemId === itemId && item.itemType === itemType && item.locationId === locationId
-    );
-    
-    if (existingStockItem) {
-      // Update existing stock
-      setStock(prev => 
-        prev.map(item => 
-          item.id === existingStockItem.id
-            ? { 
-                ...item, 
-                quantity: Math.max(0, item.quantity + quantityChange),
-                updatedAt: new Date().toISOString() 
-              }
-            : item
-        )
-      );
-    } else if (quantityChange > 0) {
-      // Create new stock entry if it's an addition
-      const newStockItem: StockItem = {
-        id: uuidv4(),
-        itemId,
-        itemType,
-        locationId,
-        quantity: quantityChange,
-        updatedAt: new Date().toISOString(),
-      };
-      
-      setStock(prev => [...prev, newStockItem]);
-    }
-  };
-
   // Get transactions for a specific location
   const getTransactionsByLocation = (locationId: string | null): StockTransaction[] => {
     if (!locationId) return transactions;
@@ -594,7 +509,6 @@ export const MedicationProvider = ({ children }: MedicationProviderProps) => {
       itemType: damagedItemData.itemType,
       quantity: damagedItemData.quantity,
       reason: damagedItemData.reason,
-      status: 'completed',
     });
     
     return newDamagedItem.id;
