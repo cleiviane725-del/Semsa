@@ -117,6 +117,8 @@ const UtensilDetail = () => {
       setUtensil(editedUtensil);
       setIsEditing(false);
       
+      addNotification({
+        type: 'success',
         medicationId: utensil.id,
         title: 'Utensílio Atualizado',
         message: `${editedUtensil.name} foi atualizado com sucesso.`,
