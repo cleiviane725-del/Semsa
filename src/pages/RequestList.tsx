@@ -29,11 +29,6 @@ const RequestList = () => {
       relevantTransactions = relevantTransactions.filter(
         t => t.sourceLocationId === user.ubsId || t.destinationLocationId === user.ubsId
       );
-    } else if (user?.role === 'warehouse') {
-      // Warehouse: show approved transactions from warehouse (ready for delivery)
-      relevantTransactions = relevantTransactions.filter(
-        t => t.sourceLocationId === 'warehouse1' && t.status === 'approved'
-      );
     }
 
     // Apply search filter
@@ -57,6 +52,9 @@ const RequestList = () => {
     // Apply status filter
     if (statusFilter !== 'all') {
       relevantTransactions = relevantTransactions.filter(t => t.status === statusFilter);
+    } else if (user?.role === 'warehouse') {
+      // Warehouse: by default show only approved transactions (ready for delivery)
+      relevantTransactions = relevantTransactions.filter(t => t.status === 'approved');
     }
 
     // Sort by request date (newest first)
