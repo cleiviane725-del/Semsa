@@ -72,6 +72,7 @@ const Dashboard = () => {
       totalDistributions: recentDistributions.length,
       damagedItems: damagedItemsCount,
     });
+  }, [medications, utensils, stock, transactions, user]);
 
   const filterTransactions = (type: string, status?: string) => {
     let filtered = [...transactions];
@@ -102,7 +103,7 @@ const Dashboard = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <StatsCard
-          title="Total de Itens"
+          title="Total de Medicamentos"
           value={stats.totalMedications}
           icon={<Pill className="h-12 w-12 text-primary-500" />}
           bgColor="bg-primary-50"
@@ -148,10 +149,10 @@ const Dashboard = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="card">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold">Itens com Estoque Baixo</h2>
-            <span className="text-sm text-primary-600">
+            <h2 className="text-lg font-semibold">Medicamentos com Estoque Baixo</h2>
+            <a href="/medications" className="text-sm text-primary-600 hover:text-primary-700">
               Ver todos
-            </span>
+            </a>
           </div>
           <div className="bg-white rounded-lg overflow-hidden">
             <div className="overflow-x-auto">
@@ -159,53 +160,43 @@ const Dashboard = () => {
                 <thead className="bg-gray-50">
                   <tr>
                     <th scope="col">Nome</th>
-                    <th scope="col">Tipo</th>
                     <th scope="col">Categoria</th>
                     <th scope="col">Estoque Atual</th>
                     <th scope="col">Estoque Mínimo</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {[...medications.map(m => ({...m, itemType: 'medication' as const})), ...utensils.map(u => ({...u, itemType: 'utensil' as const}))]
-                    .filter(item => {
+                  {medications
+                    .filter(med => {
                       const totalStock = stock
-                        .filter(stockItem => stockItem.itemId === item.id && stockItem.itemType === item.itemType)
-                        .reduce((sum, stockItem) => sum + stockItem.quantity, 0);
-                      return totalStock <= item.minimumStock;
+                        .filter(item => item.medicationId === med.id)
+                        .reduce((sum, item) => sum + item.quantity, 0);
+                      return totalStock <= med.minimumStock;
                     })
                     .slice(0, 5)
-                    .map(item => {
+                    .map(med => {
                       const totalStock = stock
-                        .filter(stockItem => stockItem.itemId === item.id && stockItem.itemType === item.itemType)
-                        .reduce((sum, stockItem) => sum + stockItem.quantity, 0);
+                        .filter(item => item.medicationId === med.id)
+                        .reduce((sum, item) => sum + item.quantity, 0);
                       
                       return (
-                        <tr key={item.id}>
-                          <td className="font-medium">{item.name}</td>
-                          <td>
-                            <span className={`badge ${
-                              item.itemType === 'medication' 
-                                ? 'bg-primary-100 text-primary-800' 
-                                : 'bg-secondary-100 text-secondary-800'
-                            }`}>
-                              {item.itemType === 'medication' ? 'Medicamento' : 'Utensílio'}
-                            </span>
-                          </td>
-                          <td>{item.category}</td>
+                        <tr key={med.id}>
+                          <td className="font-medium">{med.name}</td>
+                          <td>{med.category}</td>
                           <td className="text-danger-600 font-medium">{totalStock}</td>
-                          <td>{item.minimumStock}</td>
+                          <td>{med.minimumStock}</td>
                         </tr>
                       );
                     })}
-                  {[...medications.map(m => ({...m, itemType: 'medication' as const})), ...utensils.map(u => ({...u, itemType: 'utensil' as const}))].filter(item => {
+                  {medications.filter(med => {
                     const totalStock = stock
-                      .filter(stockItem => stockItem.itemId === item.id && stockItem.itemType === item.itemType)
-                      .reduce((sum, stockItem) => sum + stockItem.quantity, 0);
-                    return totalStock <= item.minimumStock;
+                      .filter(item => item.medicationId === med.id)
+                      .reduce((sum, item) => sum + item.quantity, 0);
+                    return totalStock <= med.minimumStock;
                   }).length === 0 && (
                     <tr>
-                      <td colSpan={5} className="text-center py-4 text-gray-500">
-                        Nenhum item com estoque baixo
+                      <td colSpan={4} className="text-center py-4 text-gray-500">
+                        Nenhum medicamento com estoque baixo
                       </td>
                     </tr>
                   )}
@@ -217,10 +208,10 @@ const Dashboard = () => {
 
         <div className="card">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold">Itens a Vencer</h2>
-            <span className="text-sm text-primary-600">
+            <h2 className="text-lg font-semibold">Medicamentos a Vencer</h2>
+            <a href="/medications" className="text-sm text-primary-600 hover:text-primary-700">
               Ver todos
-            </span>
+            </a>
           </div>
           <div className="bg-white rounded-lg overflow-hidden">
             <div className="overflow-x-auto">
@@ -228,18 +219,16 @@ const Dashboard = () => {
                 <thead className="bg-gray-50">
                   <tr>
                     <th scope="col">Nome</th>
-                    <th scope="col">Tipo</th>
                     <th scope="col">Lote</th>
                     <th scope="col">Validade</th>
                     <th scope="col">Dias Restantes</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {[...medications.map(m => ({...m, itemType: 'medication' as const})), ...utensils.map(u => ({...u, itemType: 'utensil' as const}))]
-                    .filter(item => {
-                      if (!item.expiryDate) return false;
+                  {medications
+                    .filter(med => {
                       const daysUntilExpiry = differenceInDays(
-                        new Date(item.expiryDate),
+                        new Date(med.expiryDate),
                         new Date()
                       );
                       return daysUntilExpiry >= 0 && daysUntilExpiry <= 30;
@@ -248,26 +237,17 @@ const Dashboard = () => {
                       new Date(a.expiryDate).getTime() - new Date(b.expiryDate).getTime()
                     )
                     .slice(0, 5)
-                    .map(item => {
+                    .map(med => {
                       const daysUntilExpiry = differenceInDays(
-                        new Date(item.expiryDate!),
+                        new Date(med.expiryDate),
                         new Date()
                       );
                       
                       return (
-                        <tr key={item.id}>
-                          <td className="font-medium">{item.name}</td>
-                          <td>
-                            <span className={`badge ${
-                              item.itemType === 'medication' 
-                                ? 'bg-primary-100 text-primary-800' 
-                                : 'bg-secondary-100 text-secondary-800'
-                            }`}>
-                              {item.itemType === 'medication' ? 'Medicamento' : 'Utensílio'}
-                            </span>
-                          </td>
-                          <td>{item.batch}</td>
-                          <td>{new Date(item.expiryDate!).toLocaleDateString()}</td>
+                        <tr key={med.id}>
+                          <td className="font-medium">{med.name}</td>
+                          <td>{med.batch}</td>
+                          <td>{new Date(med.expiryDate).toLocaleDateString()}</td>
                           <td>
                             <span 
                               className={`${
@@ -284,17 +264,16 @@ const Dashboard = () => {
                         </tr>
                       );
                     })}
-                  {[...medications.map(m => ({...m, itemType: 'medication' as const})), ...utensils.map(u => ({...u, itemType: 'utensil' as const}))].filter(item => {
-                    if (!item.expiryDate) return false;
+                  {medications.filter(med => {
                     const daysUntilExpiry = differenceInDays(
-                      new Date(item.expiryDate),
+                      new Date(med.expiryDate),
                       new Date()
                     );
                     return daysUntilExpiry >= 0 && daysUntilExpiry <= 30;
                   }).length === 0 && (
                     <tr>
-                      <td colSpan={5} className="text-center py-4 text-gray-500">
-                        Nenhum item próximo do vencimento
+                      <td colSpan={4} className="text-center py-4 text-gray-500">
+                        Nenhum medicamento próximo do vencimento
                       </td>
                     </tr>
                   )}
@@ -327,18 +306,10 @@ const Dashboard = () => {
                 <tbody>
                   {filterTransactions('distribution')
                     .map(transaction => {
-                      let itemName = 'Desconhecido';
-                      if (transaction.itemType === 'medication') {
-                        const medication = medications.find(m => m.id === transaction.itemId);
-                        itemName = medication ? medication.name : 'Desconhecido';
-                      } else if (transaction.itemType === 'utensil') {
-                        const utensil = utensils.find(u => u.id === transaction.itemId);
-                        itemName = utensil ? utensil.name : 'Desconhecido';
-                      }
-                      
+                      const medication = medications.find(m => m.id === transaction.medicationId);
                       return (
                         <tr key={transaction.id}>
-                          <td className="font-medium">{itemName}</td>
+                          <td className="font-medium">{medication?.name || 'Desconhecido'}</td>
                           <td>{transaction.quantity}</td>
                           <td>
                             <span 
