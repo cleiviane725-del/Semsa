@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ClipboardList, Search, Filter, Check, X, Info, Download } from 'lucide-react';
+import { ClipboardList, Search, Filter, Check, X, Info, Download, Plus } from 'lucide-react';
 import { useMedication } from '../hooks/useMedication';
 import { useAuth } from '../hooks/useAuth';
 import { useNotification } from '../hooks/useNotification';
