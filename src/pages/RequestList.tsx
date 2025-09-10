@@ -408,6 +408,8 @@ const RequestList = () => {
                   <p className="text-sm text-gray-500">Item</p>
                   <p className="font-medium">
                     {getMedicationById(selectedTransaction.medicationId)?.name || 'Desconhecido'}
+                  </p>
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
