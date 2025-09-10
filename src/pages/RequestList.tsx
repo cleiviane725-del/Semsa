@@ -19,6 +19,17 @@ const RequestList = () => {
   const [bulkRequest, setBulkRequest] = useState<{[key: string]: {quantity: number, reason: string}}>({});
   const [previewItems, setPreviewItems] = useState<any[]>([]);
 
+  // Set initial status filter based on user role
+  useEffect(() => {
+    if (user?.role === 'warehouse') {
+      setStatusFilter('approved');
+    } else if (user?.role === 'admin') {
+      setStatusFilter('pending');
+    } else {
+      setStatusFilter('all');
+    }
+  }, [user?.role]);
+
   useEffect(() => {
     // Get only distribution transactions
     let relevantTransactions = transactions.filter(t => t.type === 'distribution');
@@ -29,6 +40,9 @@ const RequestList = () => {
       relevantTransactions = relevantTransactions.filter(
         t => t.sourceLocationId === user.ubsId || t.destinationLocationId === user.ubsId
       );
+    } else if (user?.role === 'warehouse') {
+      // Warehouse: show all transactions (no location filter)
+      // They need to see all approved requests to process them
     }
 
     // Apply search filter
@@ -52,9 +66,6 @@ const RequestList = () => {
     // Apply status filter
     if (statusFilter !== 'all') {
       relevantTransactions = relevantTransactions.filter(t => t.status === statusFilter);
-    } else if (user?.role === 'warehouse') {
-      // Warehouse: by default show only approved transactions (ready for delivery)
-      relevantTransactions = relevantTransactions.filter(t => t.status === 'approved');
     }
 
     // Sort by request date (newest first)
