@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ClipboardList, Search, Filter, Check, X, Info, Download, Plus, FileText } from 'lucide-react';
+import { ClipboardList, Search, Filter, Check, X, Info, Download, Plus } from 'lucide-react';
 import { useMedication } from '../hooks/useMedication';
 import { useAuth } from '../hooks/useAuth';
 import { useNotification } from '../hooks/useNotification';
@@ -105,6 +105,257 @@ const RequestList = () => {
       });
       
       setShowModal(false);
+    }
+  };
+
+  const handleDeliver = () => {
+    if (!selectedTransaction || !user?.id) return;
+
+    // Get medication details
+    const medication = getMedicationById(selectedTransaction.medicationId);
+    const sourceLocation = selectedTransaction.sourceLocationId 
+      ? getLocationById(selectedTransaction.sourceLocationId) 
+      : null;
+    const destinationLocation = selectedTransaction.destinationLocationId
+      ? getLocationById(selectedTransaction.destinationLocationId)
+      : null;
+
+    // Generate delivery PDF
+    generateDeliveryPDF({
+      transaction: selectedTransaction,
+      medication,
+      sourceLocation,
+      destinationLocation,
+      warehouseUser: user,
+    });
+
+    // Mark as completed
+    updateTransactionStatus(selectedTransaction.id, 'completed', user.id);
+    
+    addNotification({
+      type: 'success',
+      title: 'Entrega Realizada',
+      message: `A entrega foi registrada e o PDF foi gerado com sucesso.`,
+    });
+    
+    setShowModal(false);
+  };
+
+  const generateDeliveryPDF = ({ transaction, medication, sourceLocation, destinationLocation, warehouseUser }) => {
+    const now = new Date();
+    const deliveryDate = now.toLocaleDateString('pt-BR');
+    const deliveryTime = now.toLocaleTimeString('pt-BR');
+    
+    // Create PDF content
+    const pdfContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Comprovante de Entrega - SemsaControl</title>
+        <style>
+          body { 
+            font-family: Arial, sans-serif; 
+            margin: 20px; 
+            line-height: 1.6;
+            color: #333;
+          }
+          .header { 
+            text-align: center; 
+            margin-bottom: 40px; 
+            border-bottom: 2px solid #0891b2;
+            padding-bottom: 20px;
+          }
+          .header h1 { 
+            color: #0891b2; 
+            margin: 0; 
+            font-size: 28px;
+          }
+          .header p { 
+            margin: 5px 0; 
+            color: #666; 
+            font-size: 16px;
+          }
+          .info-section {
+            margin: 30px 0;
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #0891b2;
+          }
+          .info-section h3 {
+            color: #0891b2;
+            margin-top: 0;
+            font-size: 18px;
+          }
+          .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin: 20px 0;
+          }
+          .info-item {
+            margin: 10px 0;
+          }
+          .info-item strong {
+            color: #0891b2;
+            display: inline-block;
+            width: 150px;
+          }
+          table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            margin: 20px 0;
+            background: white;
+          }
+          th, td { 
+            border: 1px solid #ddd; 
+            padding: 12px; 
+            text-align: left; 
+          }
+          th { 
+            background-color: #0891b2; 
+            color: white;
+            font-weight: bold;
+          }
+          tr:nth-child(even) {
+            background-color: #f8f9fa;
+          }
+          .signatures {
+            margin-top: 60px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+          }
+          .signature-box {
+            text-align: center;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background: #f8f9fa;
+          }
+          .signature-line { 
+            border-bottom: 2px solid #333; 
+            width: 100%; 
+            margin: 30px 0 10px 0; 
+            height: 40px;
+          }
+          .footer {
+            margin-top: 40px;
+            text-align: center;
+            font-size: 12px;
+            color: #666;
+            border-top: 1px solid #ddd;
+            padding-top: 20px;
+          }
+          .delivery-info {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid #2196f3;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>SemsaControl</h1>
+          <p>Sistema de Controle de Medicamentos</p>
+          <p><strong>COMPROVANTE DE ENTREGA</strong></p>
+        </div>
+        
+        <div class="delivery-info">
+          <h3>📦 Informações da Entrega</h3>
+          <div class="info-grid">
+            <div>
+              <div class="info-item"><strong>Data:</strong> ${deliveryDate}</div>
+              <div class="info-item"><strong>Horário:</strong> ${deliveryTime}</div>
+            </div>
+            <div>
+              <div class="info-item"><strong>Protocolo:</strong> #${transaction.id.substring(0, 8).toUpperCase()}</div>
+              <div class="info-item"><strong>Status:</strong> Entregue</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="info-section">
+          <h3>🏥 Informações da UBS Solicitante</h3>
+          <div class="info-item"><strong>UBS:</strong> ${destinationLocation?.name || 'N/A'}</div>
+          <div class="info-item"><strong>Farmacêutico:</strong> Maria Souza</div>
+          <div class="info-item"><strong>Data da Solicitação:</strong> ${new Date(transaction.requestDate).toLocaleDateString('pt-BR')}</div>
+        </div>
+
+        <div class="info-section">
+          <h3>👨‍💼 Informações do Administrador</h3>
+          <div class="info-item"><strong>Administrador:</strong> João Silva</div>
+          <div class="info-item"><strong>Data da Aprovação:</strong> ${transaction.processDate ? new Date(transaction.processDate).toLocaleDateString('pt-BR') : 'N/A'}</div>
+          <div class="info-item"><strong>Status:</strong> Aprovado</div>
+        </div>
+
+        <div class="info-section">
+          <h3>📦 Informações do Almoxarifado</h3>
+          <div class="info-item"><strong>Responsável:</strong> ${warehouseUser.name}</div>
+          <div class="info-item"><strong>Local:</strong> ${sourceLocation?.name || 'Almoxarifado Central'}</div>
+          <div class="info-item"><strong>Data da Entrega:</strong> ${deliveryDate} às ${deliveryTime}</div>
+        </div>
+        
+        <table>
+          <thead>
+            <tr>
+              <th>Medicamento</th>
+              <th>Fabricante</th>
+              <th>Lote</th>
+              <th>Quantidade Entregue</th>
+              <th>Motivo</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>${medication?.name || 'Desconhecido'}</td>
+              <td>${medication?.manufacturer || 'N/A'}</td>
+              <td>${medication?.batch || 'N/A'}</td>
+              <td><strong>${transaction.quantity} unidades</strong></td>
+              <td>${transaction.reason}</td>
+            </tr>
+          </tbody>
+        </table>
+        
+        <div class="signatures">
+          <div class="signature-box">
+            <h4>Assinatura do Administrador</h4>
+            <div class="signature-line"></div>
+            <p><strong>João Silva</strong></p>
+            <p>Administrador</p>
+            <p>Data: ___/___/______</p>
+          </div>
+          
+          <div class="signature-box">
+            <h4>Assinatura do Farmacêutico</h4>
+            <div class="signature-line"></div>
+            <p><strong>Maria Souza</strong></p>
+            <p>Farmacêutico Responsável</p>
+            <p>UBS: ${destinationLocation?.name || 'N/A'}</p>
+          </div>
+        </div>
+        
+        <div class="footer">
+          <p>Este documento comprova a entrega dos medicamentos listados acima.</p>
+          <p>SemsaControl v1.0 - Sistema de Controle de Medicamentos</p>
+          <p>Gerado em: ${deliveryDate} às ${deliveryTime}</p>
+        </div>
+      </body>
+      </html>
+    `;
+    
+    // Open PDF in new window for download
+    const newWindow = window.open('', '_blank');
+    if (newWindow) {
+      newWindow.document.write(pdfContent);
+      newWindow.document.close();
+      
+      // Trigger print dialog which allows saving as PDF
+      setTimeout(() => {
+        newWindow.print();
+      }, 500);
     }
   };
 
