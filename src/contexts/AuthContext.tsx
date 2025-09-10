@@ -70,7 +70,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         ubsName: 'UBS Centro',
       },
       {
-        id: 'warehouse1',
+        id: 'warehouse_user1',
         name: 'Pedro Santos',
         email: 'almoxarifado@example.com',
         password: 'warehouse123',
@@ -85,12 +85,14 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     if (foundUser) {
       // Remove password before storing
       const { password, ...userWithoutPassword } = foundUser;
+      console.log('Login successful for user:', userWithoutPassword); // Debug log
       setUser(userWithoutPassword);
       setIsAuthenticated(true);
       localStorage.setItem('med_user', JSON.stringify(userWithoutPassword));
       return true;
     }
 
+    console.log('Login failed for:', email); // Debug log
     return false;
   };
 

@@ -119,6 +119,7 @@ const Login = () => {
                 <h5 className="text-sm font-medium text-gray-700">Almoxarifado</h5>
                 <p className="text-xs text-gray-500">Email: almoxarifado@example.com</p>
                 <p className="text-xs text-gray-500">Senha: warehouse123</p>
+                <p className="text-xs text-gray-400">Role: warehouse</p>
               </div>
             </div>
           </div>

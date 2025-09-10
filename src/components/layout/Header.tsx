@@ -122,7 +122,11 @@ const Header = () => {
               <div>
                 <p className="text-sm font-medium">{user?.name}</p>
                 <p className="text-xs text-gray-500">
-                  {user?.role === 'admin' ? 'Administrador' : `Farmacêutico - ${user?.ubsName}`}
+                  {user?.role === 'admin' 
+                    ? 'Administrador' 
+                    : user?.role === 'warehouse'
+                    ? 'Almoxarifado'
+                    : `Farmacêutico - ${user?.ubsName}`}
                 </p>
               </div>
             </button>
