@@ -6,7 +6,7 @@ import { useNotification } from '../hooks/useNotification';
 import { differenceInDays } from 'date-fns';
 
 const Dashboard = () => {
-  const { medications, locations, stock, transactions } = useMedication();
+  const { medications, utensils, locations, stock, transactions } = useMedication();
   const { user } = useAuth();
   const { notifications } = useNotification();
   const [stats, setStats] = useState({
@@ -72,7 +72,7 @@ const Dashboard = () => {
       totalDistributions: recentDistributions.length,
       damagedItems: damagedItemsCount,
     });
-  }, [medications, stock, transactions, user]);
+  }, [medications, utensils, stock, transactions, user]);
 
   const filterTransactions = (type: string, status?: string) => {
     let filtered = [...transactions];
@@ -103,7 +103,7 @@ const Dashboard = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <StatsCard
-          title="Total de Medicamentos"
+          title="Total de Itens"
           value={stats.totalMedications}
           icon={<Pill className="h-12 w-12 text-primary-500" />}
           bgColor="bg-primary-50"
