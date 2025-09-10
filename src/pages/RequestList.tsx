@@ -14,6 +14,9 @@ const RequestList = () => {
   const [selectedTransaction, setSelectedTransaction] = useState<any>(null);
   const [showModal, setShowModal] = useState(false);
   const [selectedTransactions, setSelectedTransactions] = useState<string[]>([]);
+  const [showBulkRequestModal, setShowBulkRequestModal] = useState(false);
+  const [bulkRequest, setBulkRequest] = useState<{[key: string]: number}>({});
+  const [showPreview, setShowPreview] = useState(false);
 
   useEffect(() => {
     // Get only distribution transactions
