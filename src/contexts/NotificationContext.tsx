@@ -40,7 +40,7 @@ interface NotificationProviderProps {
 
 export const NotificationProvider = ({ children }: NotificationProviderProps) => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const { medications, stock, locations } = useMedication();
+  const { medications, stock, locations, utensils } = useMedication();
 
   // Load notifications from localStorage
   useEffect(() => {
@@ -136,7 +136,6 @@ export const NotificationProvider = ({ children }: NotificationProviderProps) =>
     });
     
     // Check utensils
-    const { utensils } = useMedication();
     utensils.forEach(utensil => {
       const totalStock = stock
         .filter(item => item.itemId === utensil.id && item.itemType === 'utensil')
