@@ -14,6 +14,10 @@ const RequestList = () => {
   const [selectedTransaction, setSelectedTransaction] = useState<any>(null);
   const [showModal, setShowModal] = useState(false);
   const [selectedTransactions, setSelectedTransactions] = useState<string[]>([]);
+  const [showBulkRequestModal, setShowBulkRequestModal] = useState(false);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [bulkRequest, setBulkRequest] = useState<{[key: string]: {quantity: number, reason: string}}>({});
+  const [previewItems, setPreviewItems] = useState<any[]>([]);
 
   useEffect(() => {
     // Get only distribution transactions
@@ -124,6 +128,91 @@ const RequestList = () => {
     setSelectedTransactions([]);
   };
 
+  const handleBulkRequestChange = (itemId: string, itemType: 'medication' | 'utensil', field: 'quantity' | 'reason', value: string | number) => {
+    setBulkRequest(prev => ({
+      ...prev,
+      [`${itemType}_${itemId}`]: {
+        ...prev[`${itemType}_${itemId}`],
+        [field]: field === 'quantity' ? parseInt(value as string) || 0 : value,
+        quantity: field === 'quantity' ? parseInt(value as string) || 0 : prev[`${itemType}_${itemId}`]?.quantity || 0,
+        reason: field === 'reason' ? value as string : prev[`${itemType}_${itemId}`]?.reason || ''
+      }
+    }));
+  };
+
+  const handleBulkRequestSubmit = () => {
+    const itemsWithQuantity = [];
+    
+    // Check medications
+    medications.forEach(med => {
+      const key = `medication_${med.id}`;
+      if (bulkRequest[key]?.quantity > 0) {
+        itemsWithQuantity.push({
+          id: med.id,
+          name: med.name,
+          type: 'medication',
+          quantity: bulkRequest[key].quantity,
+          reason: bulkRequest[key].reason || 'Solicitação em lote'
+        });
+      }
+    });
+    
+    // Check utensils
+    utensils.forEach(utensil => {
+      const key = `utensil_${utensil.id}`;
+      if (bulkRequest[key]?.quantity > 0) {
+        itemsWithQuantity.push({
+          id: utensil.id,
+          name: utensil.name,
+          type: 'utensil',
+          quantity: bulkRequest[key].quantity,
+          reason: bulkRequest[key].reason || 'Solicitação em lote'
+        });
+      }
+    });
+    
+    if (itemsWithQuantity.length === 0) {
+      addNotification({
+        type: 'warning',
+        title: 'Nenhum Item Selecionado',
+        message: 'Adicione quantidades aos itens que deseja solicitar.',
+      });
+      return;
+    }
+    
+    setPreviewItems(itemsWithQuantity);
+    setShowPreviewModal(true);
+  };
+
+  const handleConfirmBulkRequest = () => {
+    previewItems.forEach(item => {
+      addStockTransaction({
+        type: 'distribution',
+        sourceLocationId: user?.ubsId || '',
+        destinationLocationId: user?.ubsId || '',
+        itemId: item.id,
+        itemType: item.type,
+        quantity: item.quantity,
+        reason: item.reason,
+      });
+    });
+    
+    addNotification({
+      type: 'success',
+      title: 'Solicitação Enviada',
+      message: `Solicitação de ${previewItems.length} itens enviada com sucesso ao Administrador.`,
+    });
+    
+    setShowBulkRequestModal(false);
+    setShowPreviewModal(false);
+    setBulkRequest({});
+    setPreviewItems([]);
+  };
+
+  const handleCancelPreview = () => {
+    setShowPreviewModal(false);
+  };
+
   const handleSelectTransaction = (transactionId: string) => {
     setSelectedTransactions(prev => 
       prev.includes(transactionId)
@@ -146,6 +235,15 @@ const RequestList = () => {
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Solicitações</h1>
+        {user?.role === 'pharmacist' && (
+          <button 
+            onClick={() => setShowBulkRequestModal(true)}
+            className="btn-primary flex items-center gap-2"
+          >
+            <Plus size={18} />
+            <span>Nova Solicitação</span>
+          </button>
+        )}
         {(user?.role === 'admin' || user?.role === 'warehouse') && (
           <button 
             onClick={handleGeneratePDF}

@@ -499,7 +499,7 @@ const MedicationDetail = () => {
               >
                 <Truck size={18} />
                 <span>
-                  {user?.role === 'admin' ? 'Distribuir para UBS' : 'Solicitar ao Almoxarifado'}
+                  {user?.role === 'admin' ? 'Distribuir para UBS' : 'Solicitar ao Administrador'}
                 </span>
               </button>
               <button
@@ -737,8 +737,8 @@ const MedicationDetail = () => {
           <div className="bg-white rounded-lg shadow-xl max-w-md mx-auto p-6 w-full">
             <h3 className="text-xl font-bold mb-4">
               {user?.role === 'admin' 
-                ? 'Distribuir Medicamento para UBS' 
-                : 'Solicitar Medicamento ao Almoxarifado'}
+                ? 'Distribuir Medicamento para UBS'
+                : 'Solicitar Medicamento ao Administrador'}
             </h3>
             <div className="space-y-4">
               {user?.role === 'admin' ? (
@@ -784,7 +784,7 @@ const MedicationDetail = () => {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700">
-                  Motivo da Solicitação
+                  Motivo da Solicitação ao Administrador
                 </label>
                 <textarea
                   name="reason"
@@ -792,7 +792,7 @@ const MedicationDetail = () => {
                   onChange={handleDistributeStockChange}
                   className="input mt-1"
                   rows={3}
-                  placeholder="Ex: Distribuição mensal, reposição de estoque..."
+                  placeholder="Ex: Estoque baixo na UBS, reposição urgente..."
                 />
               </div>
               <div className="flex justify-end gap-3 mt-6">
