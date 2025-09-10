@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
-import { ClipboardList, Search, Filter, Check, X, Info } from 'lucide-react';
+import { ClipboardList, Search, Filter, Check, X, Info, Download } from 'lucide-react';
 import { useMedication } from '../hooks/useMedication';
 import { useAuth } from '../hooks/useAuth';
 import { useNotification } from '../hooks/useNotification';
 
 const RequestList = () => {
-  const { medications, locations, transactions, getMedicationById, getLocationById, updateTransactionStatus } = useMedication();
+  const { medications, utensils, locations, transactions, getMedicationById, getUtensilById, getLocationById, updateTransactionStatus, generatePDF } = useMedication();
   const { user } = useAuth();
   const { addNotification } = useNotification();
   const [searchTerm, setSearchTerm] = useState('');
@@ -13,6 +13,7 @@ const RequestList = () => {
   const [filteredTransactions, setFilteredTransactions] = useState<any[]>([]);
   const [selectedTransaction, setSelectedTransaction] = useState<any>(null);
   const [showModal, setShowModal] = useState(false);
+  const [selectedTransactions, setSelectedTransactions] = useState<string[]>([]);
 
   useEffect(() => {
     // Get only distribution transactions
@@ -28,12 +29,20 @@ const RequestList = () => {
     // Apply search filter
     if (searchTerm) {
       relevantTransactions = relevantTransactions.filter(t => {
-        const medication = getMedicationById(t.medicationId);
+        let itemName = '';
+        if (t.itemType === 'medication') {
+          const medication = getMedicationById(t.itemId);
+          itemName = medication ? medication.name : '';
+        } else {
+          const utensil = getUtensilById(t.itemId);
+          itemName = utensil ? utensil.name : '';
+        }
+        
         const sourceName = t.sourceLocationId ? getLocationById(t.sourceLocationId)?.name : '';
         const destinationName = t.destinationLocationId ? getLocationById(t.destinationLocationId)?.name : '';
         
         return (
-          medication?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          itemName.toLowerCase().includes(searchTerm.toLowerCase()) ||
           sourceName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
           destinationName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
           t.reason.toLowerCase().includes(searchTerm.toLowerCase())
@@ -52,7 +61,7 @@ const RequestList = () => {
     );
 
     setFilteredTransactions(relevantTransactions);
-  }, [transactions, searchTerm, statusFilter, user, getMedicationById, getLocationById]);
+  }, [transactions, searchTerm, statusFilter, user, getMedicationById, getUtensilById, getLocationById]);
 
   const handleTransactionSelect = (transaction: any) => {
     setSelectedTransaction(transaction);
@@ -101,10 +110,52 @@ const RequestList = () => {
     }
   };
 
+  const handleGeneratePDF = () => {
+    if (selectedTransactions.length === 0) {
+      addNotification({
+        type: 'warning',
+        title: 'Nenhuma Solicitação Selecionada',
+        message: 'Selecione pelo menos uma solicitação para gerar o PDF.',
+      });
+      return;
+    }
+    
+    generatePDF(selectedTransactions);
+    setSelectedTransactions([]);
+  };
+
+  const handleSelectTransaction = (transactionId: string) => {
+    setSelectedTransactions(prev => 
+      prev.includes(transactionId)
+        ? prev.filter(id => id !== transactionId)
+        : [...prev, transactionId]
+    );
+  };
+
+  const handleSelectAll = () => {
+    const approvedOrCompleted = filteredTransactions
+      .filter(t => t.status === 'approved' || t.status === 'completed')
+      .map(t => t.id);
+    
+    setSelectedTransactions(
+      selectedTransactions.length === approvedOrCompleted.length ? [] : approvedOrCompleted
+    );
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Solicitações</h1>
+        {(user?.role === 'admin' || user?.role === 'warehouse') && (
+          <button 
+            onClick={handleGeneratePDF}
+            className="btn-primary flex items-center gap-2"
+            disabled={selectedTransactions.length === 0}
+          >
+            <Download size={18} />
+            <span>Gerar PDF ({selectedTransactions.length})</span>
+          </button>
+        )}
       </div>
 
       <div className="flex flex-col sm:flex-row gap-4">
@@ -142,6 +193,25 @@ const RequestList = () => {
           <table className="table">
             <thead className="bg-gray-50">
               <tr>
+                {(user?.role === 'admin' || user?.role === 'warehouse') && (
+                  <th scope="col">
+                    <input
+                      type="checkbox"
+                      checked={
+                        filteredTransactions
+                          .filter(t => t.status === 'approved' || t.status === 'completed')
+                          .length > 0 &&
+                        selectedTransactions.length === 
+                        filteredTransactions
+                          .filter(t => t.status === 'approved' || t.status === 'completed')
+                          .length
+                      }
+                      onChange={handleSelectAll}
+                      className="rounded"
+                    />
+                  </th>
+                )}
+                <th scope="col">Tipo</th>
                 <th scope="col">Medicamento</th>
                 <th scope="col">Solicitante</th>
                 <th scope="col">Destino</th>
@@ -153,7 +223,15 @@ const RequestList = () => {
             </thead>
             <tbody>
               {filteredTransactions.map(transaction => {
-                const medication = getMedicationById(transaction.medicationId);
+                let itemName = 'Desconhecido';
+                if (transaction.itemType === 'medication') {
+                  const medication = getMedicationById(transaction.itemId);
+                  itemName = medication ? medication.name : 'Desconhecido';
+                } else {
+                  const utensil = getUtensilById(transaction.itemId);
+                  itemName = utensil ? utensil.name : 'Desconhecido';
+                }
+                
                 const sourceLocation = transaction.sourceLocationId 
                   ? getLocationById(transaction.sourceLocationId) 
                   : null;
@@ -163,7 +241,28 @@ const RequestList = () => {
 
                 return (
                   <tr key={transaction.id}>
-                    <td className="font-medium">{medication?.name || 'Desconhecido'}</td>
+                    {(user?.role === 'admin' || user?.role === 'warehouse') && (
+                      <td>
+                        {(transaction.status === 'approved' || transaction.status === 'completed') && (
+                          <input
+                            type="checkbox"
+                            checked={selectedTransactions.includes(transaction.id)}
+                            onChange={() => handleSelectTransaction(transaction.id)}
+                            className="rounded"
+                          />
+                        )}
+                      </td>
+                    )}
+                    <td>
+                      <span className={`badge ${
+                        transaction.itemType === 'medication' 
+                          ? 'bg-primary-100 text-primary-800' 
+                          : 'bg-secondary-100 text-secondary-800'
+                      }`}>
+                        {transaction.itemType === 'medication' ? 'Medicamento' : 'Utensílio'}
+                      </span>
+                    </td>
+                    <td className="font-medium">{itemName}</td>
                     <td>{sourceLocation?.name || 'N/A'}</td>
                     <td>{destinationLocation?.name || 'N/A'}</td>
                     <td>{transaction.quantity}</td>
@@ -193,7 +292,7 @@ const RequestList = () => {
               })}
               {filteredTransactions.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="text-center py-4 text-gray-500">
+                  <td colSpan={(user?.role === 'admin' || user?.role === 'warehouse') ? 9 : 8} className="text-center py-4 text-gray-500">
                     Nenhuma solicitação encontrada
                   </td>
                 </tr>
@@ -220,11 +319,22 @@ const RequestList = () => {
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-sm text-gray-500">Medicamento</p>
+                  <p className="text-sm text-gray-500">Tipo</p>
                   <p className="font-medium">
-                    {getMedicationById(selectedTransaction.medicationId)?.name || 'Desconhecido'}
+                    {selectedTransaction.itemType === 'medication' ? 'Medicamento' : 'Utensílio'}
                   </p>
                 </div>
+                <div>
+                  <p className="text-sm text-gray-500">Item</p>
+                  <p className="font-medium">
+                    {selectedTransaction.itemType === 'medication'
+                      ? getMedicationById(selectedTransaction.itemId)?.name || 'Desconhecido'
+                      : getUtensilById(selectedTransaction.itemId)?.name || 'Desconhecido'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-gray-500">Quantidade</p>
                   <p className="font-medium">{selectedTransaction.quantity}</p>
@@ -302,7 +412,7 @@ const RequestList = () => {
                 </div>
               )}
 
-              {user?.role === 'admin' && selectedTransaction.status === 'approved' && (
+              {(user?.role === 'admin' || user?.role === 'warehouse') && selectedTransaction.status === 'approved' && (
                 <div className="flex justify-end gap-3 mt-6">
                   <button
                     onClick={handleComplete}

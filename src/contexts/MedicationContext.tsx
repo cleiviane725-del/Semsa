@@ -17,6 +17,20 @@ export interface Medication {
   updatedAt: string;
 }
 
+export interface Utensil {
+  id: string;
+  name: string;
+  manufacturer: string;
+  batch: string;
+  expiryDate?: string;
+  quantity: number;
+  minimumStock: number;
+  storageType: 'room' | 'refrigerated' | 'controlled';
+  category: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface StockLocation {
   id: string;
   name: string;
@@ -25,7 +39,8 @@ export interface StockLocation {
 
 export interface StockItem {
   id: string;
-  medicationId: string;
+  itemId: string;
+  itemType: 'medication' | 'utensil';
   locationId: string;
   quantity: number;
   updatedAt: string;
@@ -36,7 +51,8 @@ export interface StockTransaction {
   type: 'receipt' | 'distribution' | 'patient' | 'damaged';
   sourceLocationId: string | null;
   destinationLocationId: string | null;
-  medicationId: string;
+  itemId: string;
+  itemType: 'medication' | 'utensil';
   quantity: number;
   reason: string;
   patientId?: string;
@@ -50,7 +66,8 @@ export interface StockTransaction {
 
 export interface DamagedItem {
   id: string;
-  medicationId: string;
+  itemId: string;
+  itemType: 'medication' | 'utensil';
   locationId: string;
   quantity: number;
   batch: string;
@@ -61,6 +78,7 @@ export interface DamagedItem {
 
 interface MedicationContextType {
   medications: Medication[];
+  utensils: Utensil[];
   locations: StockLocation[];
   stock: StockItem[];
   transactions: StockTransaction[];
@@ -70,19 +88,25 @@ interface MedicationContextType {
   updateMedication: (medication: Medication) => void;
   getMedicationById: (id: string) => Medication | undefined;
   
+  addUtensil: (utensil: Omit<Utensil, 'id' | 'createdAt' | 'updatedAt'>) => string;
+  updateUtensil: (utensil: Utensil) => void;
+  getUtensilById: (id: string) => Utensil | undefined;
+  
   addStockTransaction: (transaction: Omit<StockTransaction, 'id' | 'requestDate' | 'status' | 'requestedBy'>) => string;
   updateTransactionStatus: (id: string, status: 'approved' | 'rejected' | 'completed', processedBy: string) => void;
   getTransactionsByLocation: (locationId: string | null) => StockTransaction[];
   
-  getLocationStock: (locationId: string) => Array<{medication: Medication, quantity: number}>;
-  getTotalStock: (medicationId: string) => number;
+  getLocationStock: (locationId: string) => Array<{item: Medication | Utensil, itemType: 'medication' | 'utensil', quantity: number}>;
+  getTotalStock: (itemId: string, itemType: 'medication' | 'utensil') => number;
   getLocationById: (id: string) => StockLocation | undefined;
   
   reportDamagedItem: (damagedItem: Omit<DamagedItem, 'id' | 'reportDate'>) => string;
+  generatePDF: (transactionIds: string[]) => void;
 }
 
 export const MedicationContext = createContext<MedicationContextType>({
   medications: [],
+  utensils: [],
   locations: [],
   stock: [],
   transactions: [],
@@ -91,6 +115,10 @@ export const MedicationContext = createContext<MedicationContextType>({
   addMedication: () => '',
   updateMedication: () => {},
   getMedicationById: () => undefined,
+  
+  addUtensil: () => '',
+  updateUtensil: () => {},
+  getUtensilById: () => undefined,
   
   addStockTransaction: () => '',
   updateTransactionStatus: () => {},
@@ -101,6 +129,7 @@ export const MedicationContext = createContext<MedicationContextType>({
   getLocationById: () => undefined,
   
   reportDamagedItem: () => '',
+  generatePDF: () => {},
 });
 
 interface MedicationProviderProps {
@@ -111,6 +140,7 @@ export const MedicationProvider = ({ children }: MedicationProviderProps) => {
   const { user } = useAuth();
   
   const [medications, setMedications] = useState<Medication[]>([]);
+  const [utensils, setUtensils] = useState<Utensil[]>([]);
   const [locations, setLocations] = useState<StockLocation[]>([]);
   const [stock, setStock] = useState<StockItem[]>([]);
   const [transactions, setTransactions] = useState<StockTransaction[]>([]);
@@ -122,6 +152,11 @@ export const MedicationProvider = ({ children }: MedicationProviderProps) => {
       const storedMedications = localStorage.getItem('med_medications');
       if (storedMedications) {
         setMedications(JSON.parse(storedMedications));
+      }
+
+      const storedUtensils = localStorage.getItem('med_utensils');
+      if (storedUtensils) {
+        setUtensils(JSON.parse(storedUtensils));
       }
 
       const storedLocations = localStorage.getItem('med_locations');
@@ -156,6 +191,12 @@ export const MedicationProvider = ({ children }: MedicationProviderProps) => {
   }, [medications]);
 
   useEffect(() => {
+    if (utensils.length > 0) {
+      localStorage.setItem('med_utensils', JSON.stringify(utensils));
+    }
+  }, [utensils]);
+
+  useEffect(() => {
     if (locations.length > 0) {
       localStorage.setItem('med_locations', JSON.stringify(locations));
     }
@@ -184,6 +225,11 @@ export const MedicationProvider = ({ children }: MedicationProviderProps) => {
     return medications.find(med => med.id === id);
   };
 
+  // Helper function to get utensil by ID
+  const getUtensilById = (id: string): Utensil | undefined => {
+    return utensils.find(utensil => utensil.id === id);
+  };
+
   // Helper function to get location by ID
   const getLocationById = (id: string): StockLocation | undefined => {
     return locations.find(loc => loc.id === id);
@@ -203,6 +249,20 @@ export const MedicationProvider = ({ children }: MedicationProviderProps) => {
     return newMedication.id;
   };
 
+  // Add a new utensil to the system
+  const addUtensil = (utensilData: Omit<Utensil, 'id' | 'createdAt' | 'updatedAt'>): string => {
+    const now = new Date().toISOString();
+    const newUtensil: Utensil = {
+      ...utensilData,
+      id: uuidv4(),
+      createdAt: now,
+      updatedAt: now,
+    };
+    
+    setUtensils(prev => [...prev, newUtensil]);
+    return newUtensil.id;
+  };
+
   // Update an existing medication
   const updateMedication = (medication: Medication): void => {
     setMedications(prev => 
@@ -214,23 +274,41 @@ export const MedicationProvider = ({ children }: MedicationProviderProps) => {
     );
   };
 
+  // Update an existing utensil
+  const updateUtensil = (utensil: Utensil): void => {
+    setUtensils(prev => 
+      prev.map(ut => 
+        ut.id === utensil.id 
+          ? { ...utensil, updatedAt: new Date().toISOString() } 
+          : ut
+      )
+    );
+  };
+
   // Get stock for a specific location
-  const getLocationStock = (locationId: string): Array<{medication: Medication, quantity: number}> => {
+  const getLocationStock = (locationId: string): Array<{item: Medication | Utensil, itemType: 'medication' | 'utensil', quantity: number}> => {
     const locationStock = stock.filter(item => item.locationId === locationId);
     
     return locationStock.map(stockItem => {
-      const medication = medications.find(med => med.id === stockItem.medicationId);
+      let item: Medication | Utensil | undefined;
+      if (stockItem.itemType === 'medication') {
+        item = medications.find(med => med.id === stockItem.itemId);
+      } else {
+        item = utensils.find(ut => ut.id === stockItem.itemId);
+      }
+      
       return {
-        medication: medication!,
+        item: item!,
+        itemType: stockItem.itemType,
         quantity: stockItem.quantity
       };
-    }).filter(item => item.medication !== undefined);
+    }).filter(item => item.item !== undefined);
   };
 
-  // Get total stock for a medication across all locations
-  const getTotalStock = (medicationId: string): number => {
+  // Get total stock for an item across all locations
+  const getTotalStock = (itemId: string, itemType: 'medication' | 'utensil'): number => {
     return stock
-      .filter(item => item.medicationId === medicationId)
+      .filter(item => item.itemId === itemId && item.itemType === itemType)
       .reduce((total, item) => total + item.quantity, 0);
   };
 
@@ -252,7 +330,8 @@ export const MedicationProvider = ({ children }: MedicationProviderProps) => {
     // If it's a damaged item report, process it immediately
     if (transactionData.type === 'damaged' && transactionData.sourceLocationId) {
       updateStock(
-        transactionData.medicationId,
+        transactionData.itemId,
+        transactionData.itemType,
         transactionData.sourceLocationId,
         -transactionData.quantity
       );
@@ -284,7 +363,8 @@ export const MedicationProvider = ({ children }: MedicationProviderProps) => {
     if (status === 'approved' || status === 'completed') {
       if (transaction.sourceLocationId) {
         updateStock(
-          transaction.medicationId,
+          transaction.itemId,
+          transaction.itemType,
           transaction.sourceLocationId,
           -transaction.quantity
         );
@@ -292,7 +372,8 @@ export const MedicationProvider = ({ children }: MedicationProviderProps) => {
       
       if (transaction.destinationLocationId) {
         updateStock(
-          transaction.medicationId,
+          transaction.itemId,
+          transaction.itemType,
           transaction.destinationLocationId,
           transaction.quantity
         );
@@ -301,9 +382,9 @@ export const MedicationProvider = ({ children }: MedicationProviderProps) => {
   };
 
   // Helper function to update stock levels
-  const updateStock = (medicationId: string, locationId: string, quantityChange: number): void => {
+  const updateStock = (itemId: string, itemType: 'medication' | 'utensil', locationId: string, quantityChange: number): void => {
     const existingStockItem = stock.find(
-      item => item.medicationId === medicationId && item.locationId === locationId
+      item => item.itemId === itemId && item.itemType === itemType && item.locationId === locationId
     );
     
     if (existingStockItem) {
@@ -323,7 +404,8 @@ export const MedicationProvider = ({ children }: MedicationProviderProps) => {
       // Create new stock entry if it's an addition
       const newStockItem: StockItem = {
         id: uuidv4(),
-        medicationId,
+        itemId,
+        itemType,
         locationId,
         quantity: quantityChange,
         updatedAt: new Date().toISOString(),
@@ -360,7 +442,8 @@ export const MedicationProvider = ({ children }: MedicationProviderProps) => {
       type: 'damaged',
       sourceLocationId: damagedItemData.locationId,
       destinationLocationId: null,
-      medicationId: damagedItemData.medicationId,
+      itemId: damagedItemData.itemId,
+      itemType: damagedItemData.itemType,
       quantity: damagedItemData.quantity,
       reason: damagedItemData.reason,
       status: 'completed',
@@ -369,10 +452,102 @@ export const MedicationProvider = ({ children }: MedicationProviderProps) => {
     return newDamagedItem.id;
   };
 
+  // Generate PDF for approved transactions
+  const generatePDF = (transactionIds: string[]): void => {
+    const selectedTransactions = transactions.filter(t => transactionIds.includes(t.id));
+    
+    // Create PDF content
+    let pdfContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Requisição - MedControl</title>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 20px; }
+          .header { text-align: center; margin-bottom: 30px; }
+          .header h1 { color: #0891b2; margin: 0; }
+          .header p { margin: 5px 0; color: #666; }
+          table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+          th { background-color: #f5f5f5; }
+          .signature { margin-top: 50px; }
+          .signature-line { border-bottom: 1px solid #000; width: 300px; margin: 20px 0; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>MedControl - Sistema de Controle</h1>
+          <p>Requisição de Medicamentos e Utensílios</p>
+          <p>Data: ${new Date().toLocaleDateString()} - Hora: ${new Date().toLocaleTimeString()}</p>
+        </div>
+        
+        <table>
+          <thead>
+            <tr>
+              <th>Tipo</th>
+              <th>Item</th>
+              <th>Quantidade</th>
+              <th>Origem</th>
+              <th>Destino</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+    `;
+    
+    selectedTransactions.forEach(transaction => {
+      let itemName = 'Desconhecido';
+      if (transaction.itemType === 'medication') {
+        const medication = getMedicationById(transaction.itemId);
+        itemName = medication ? medication.name : 'Desconhecido';
+      } else {
+        const utensil = getUtensilById(transaction.itemId);
+        itemName = utensil ? utensil.name : 'Desconhecido';
+      }
+      
+      const sourceName = transaction.sourceLocationId ? getLocationById(transaction.sourceLocationId)?.name : 'N/A';
+      const destinationName = transaction.destinationLocationId ? getLocationById(transaction.destinationLocationId)?.name : 'N/A';
+      
+      pdfContent += `
+        <tr>
+          <td>${transaction.itemType === 'medication' ? 'Medicamento' : 'Utensílio'}</td>
+          <td>${itemName}</td>
+          <td>${transaction.quantity}</td>
+          <td>${sourceName}</td>
+          <td>${destinationName}</td>
+          <td>${transaction.status === 'completed' ? 'Liberado' : 'Aprovado'}</td>
+        </tr>
+      `;
+    });
+    
+    pdfContent += `
+          </tbody>
+        </table>
+        
+        <div class="signature">
+          <p><strong>Assinatura do Administrador:</strong></p>
+          <div class="signature-line"></div>
+          <p>Nome: _________________________________</p>
+          <p>Data: _________________________________</p>
+        </div>
+      </body>
+      </html>
+    `;
+    
+    // Open PDF in new window
+    const newWindow = window.open('', '_blank');
+    if (newWindow) {
+      newWindow.document.write(pdfContent);
+      newWindow.document.close();
+      newWindow.print();
+    }
+  };
+
   return (
     <MedicationContext.Provider
       value={{
         medications,
+        utensils,
         locations,
         stock,
         transactions,
@@ -381,6 +556,10 @@ export const MedicationProvider = ({ children }: MedicationProviderProps) => {
         addMedication,
         updateMedication,
         getMedicationById,
+        
+        addUtensil,
+        updateUtensil,
+        getUtensilById,
         
         addStockTransaction,
         updateTransactionStatus,
@@ -391,6 +570,7 @@ export const MedicationProvider = ({ children }: MedicationProviderProps) => {
         getLocationById,
         
         reportDamagedItem,
+        generatePDF,
       }}
     >
       {children}

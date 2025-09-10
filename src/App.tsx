@@ -6,6 +6,8 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import MedicationList from './pages/MedicationList';
 import MedicationDetail from './pages/MedicationDetail';
+import UtensilList from './pages/UtensilList';
+import UtensilDetail from './pages/UtensilDetail';
 import DistributionList from './pages/DistributionList';
 import RequestList from './pages/RequestList';
 import PatientDistribution from './pages/PatientDistribution';
@@ -53,6 +55,8 @@ function App() {
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="medications" element={<MedicationList />} />
         <Route path="medications/:id" element={<MedicationDetail />} />
+        <Route path="utensils" element={<UtensilList />} />
+        <Route path="utensils/:id" element={<UtensilDetail />} />
         <Route path="inventory" element={
           <ProtectedRoute allowedRoles={['admin', 'warehouse']}>
             <DistributionList />

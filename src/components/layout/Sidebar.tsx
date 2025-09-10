@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { Heart, Package, Truck, ClipboardList, FileBadge as FileBar, Users, Home, ArrowLeft, ArrowRight, Boxes } from 'lucide-react';
+import { Heart, Package, Truck, ClipboardList, FileBadge as FileBar, Users, Home, ArrowLeft, ArrowRight, Boxes, Wrench } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 
 const Sidebar = () => {
@@ -40,6 +40,12 @@ const Sidebar = () => {
             to="/medications" 
             icon={<Package size={20} />} 
             label="Medicamentos"
+            collapsed={collapsed}
+          />
+          <SidebarItem 
+            to="/utensils" 
+            icon={<Wrench size={20} />} 
+            label="Utensílios"
             collapsed={collapsed}
           />
           {(userRole === 'admin' || userRole === 'warehouse') && (
