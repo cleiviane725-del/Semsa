@@ -111,6 +111,8 @@ const MedicationDetail = () => {
       setMedication(editedMedication);
       setIsEditing(false);
       
+      addNotification({
+        type: 'success',
         medicationId: medication.id,
         title: 'Medicamento Atualizado',
         message: `${editedMedication.name} foi atualizado com sucesso.`,
