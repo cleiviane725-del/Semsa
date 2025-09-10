@@ -6,7 +6,7 @@ import { useNotification } from '../hooks/useNotification';
 import { differenceInDays } from 'date-fns';
 
 const Dashboard = () => {
-  const { medications, utensils, locations, stock, transactions } = useMedication();
+  const { medications, locations, stock, transactions } = useMedication();
   const { user } = useAuth();
   const { notifications } = useNotification();
   const [stats, setStats] = useState({
@@ -72,7 +72,7 @@ const Dashboard = () => {
       totalDistributions: recentDistributions.length,
       damagedItems: damagedItemsCount,
     });
-  }, [medications, utensils, stock, transactions, user]);
+  }, [medications, stock, transactions, user]);
 
   const filterTransactions = (type: string, status?: string) => {
     let filtered = [...transactions];
