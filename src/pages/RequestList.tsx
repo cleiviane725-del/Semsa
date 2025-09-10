@@ -14,9 +14,6 @@ const RequestList = () => {
   const [selectedTransaction, setSelectedTransaction] = useState<any>(null);
   const [showModal, setShowModal] = useState(false);
   const [selectedTransactions, setSelectedTransactions] = useState<string[]>([]);
-  const [showBulkRequestModal, setShowBulkRequestModal] = useState(false);
-  const [bulkRequest, setBulkRequest] = useState<{[key: string]: number}>({});
-  const [showPreview, setShowPreview] = useState(false);
 
   useEffect(() => {
     // Get only distribution transactions
@@ -149,6 +146,15 @@ const RequestList = () => {
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Solicitações</h1>
+        {user?.role === 'pharmacist' && (
+          <button 
+            onClick={() => setShowBulkRequestModal(true)}
+            className="btn-primary flex items-center gap-2"
+          >
+            <Plus size={18} />
+            <span>Nova Solicitação</span>
+          </button>
+        )}
         {(user?.role === 'admin' || user?.role === 'warehouse') && (
           <button 
             onClick={handleGeneratePDF}
