@@ -51,8 +51,7 @@ export interface StockTransaction {
   type: 'receipt' | 'distribution' | 'patient' | 'damaged';
   sourceLocationId: string | null;
   destinationLocationId: string | null;
-  itemId: string;
-  itemType: 'medication' | 'utensil';
+  medicationId: string;
   quantity: number;
   reason: string;
   patientId?: string;
@@ -376,11 +375,25 @@ export const MedicationProvider = ({ children }: MedicationProviderProps) => {
 
   // Add a new stock transaction (receipt, distribution, etc.)
   const addStockTransaction = (
-    transactionData: Omit<StockTransaction, 'id' | 'requestDate' | 'status' | 'requestedBy'>
+    transactionData: Omit<StockTransaction, 'id' | 'requestDate' | 'status' | 'requestedBy'> & {
+      itemId?: string;
+      itemType?: 'medication' | 'utensil';
+    }
   ): string => {
     const now = new Date().toISOString();
+    
+    // Handle backward compatibility
+    const medicationId = transactionData.medicationId || transactionData.itemId || '';
+    
     const newTransaction: StockTransaction = {
-      ...transactionData,
+      type: transactionData.type,
+      sourceLocationId: transactionData.sourceLocationId,
+      destinationLocationId: transactionData.destinationLocationId,
+      medicationId,
+      quantity: transactionData.quantity,
+      reason: transactionData.reason,
+      patientId: transactionData.patientId,
+      patientName: transactionData.patientName,
       id: uuidv4(),
       requestDate: now,
       status: transactionData.type === 'receipt' || transactionData.type === 'damaged' ? 'completed' : 'pending',
@@ -393,15 +406,15 @@ export const MedicationProvider = ({ children }: MedicationProviderProps) => {
     if ((transactionData.type === 'receipt' || transactionData.type === 'damaged') && newTransaction.status === 'completed') {
       if (transactionData.type === 'receipt' && transactionData.destinationLocationId) {
         updateStock(
-          transactionData.itemId,
-          transactionData.itemType,
+          medicationId,
+          transactionData.itemType || 'medication',
           transactionData.destinationLocationId,
           transactionData.quantity
         );
       } else if (transactionData.type === 'damaged' && transactionData.sourceLocationId) {
         updateStock(
-          transactionData.itemId,
-          transactionData.itemType,
+          medicationId,
+          transactionData.itemType || 'medication',
           transactionData.sourceLocationId,
           -transactionData.quantity
         );
@@ -417,8 +430,8 @@ export const MedicationProvider = ({ children }: MedicationProviderProps) => {
       // Update stock immediately for admin distributions
       if (transactionData.sourceLocationId) {
         updateStock(
-          transactionData.itemId,
-          transactionData.itemType,
+          medicationId,
+          transactionData.itemType || 'medication',
           transactionData.sourceLocationId,
           -transactionData.quantity
         );
@@ -426,8 +439,8 @@ export const MedicationProvider = ({ children }: MedicationProviderProps) => {
       
       if (transactionData.destinationLocationId) {
         updateStock(
-          transactionData.itemId,
-          transactionData.itemType,
+          medicationId,
+          transactionData.itemType || 'medication',
           transactionData.destinationLocationId,
           transactionData.quantity
         );
@@ -460,8 +473,8 @@ export const MedicationProvider = ({ children }: MedicationProviderProps) => {
     if (status === 'completed') {
       if (transaction.sourceLocationId) {
         updateStock(
-          transaction.itemId,
-          transaction.itemType,
+          transaction.medicationId,
+          'medication', // Default to medication for backward compatibility
           transaction.sourceLocationId,
           -transaction.quantity
         );
@@ -469,8 +482,8 @@ export const MedicationProvider = ({ children }: MedicationProviderProps) => {
       
       if (transaction.destinationLocationId) {
         updateStock(
-          transaction.itemId,
-          transaction.itemType,
+          transaction.medicationId,
+          'medication', // Default to medication for backward compatibility
           transaction.destinationLocationId,
           transaction.quantity
         );

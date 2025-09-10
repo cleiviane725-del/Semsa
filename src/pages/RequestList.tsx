@@ -33,14 +33,8 @@ const RequestList = () => {
     // Apply search filter
     if (searchTerm) {
       relevantTransactions = relevantTransactions.filter(t => {
-        let itemName = '';
-        if (t.itemType === 'medication') {
-          const medication = getMedicationById(t.itemId);
-          itemName = medication ? medication.name : '';
-        } else {
-          const utensil = getUtensilById(t.itemId);
-          itemName = utensil ? utensil.name : '';
-        }
+        const medication = getMedicationById(t.medicationId);
+        const itemName = medication ? medication.name : '';
         
         const sourceName = t.sourceLocationId ? getLocationById(t.sourceLocationId)?.name : '';
         const destinationName = t.destinationLocationId ? getLocationById(t.destinationLocationId)?.name : '';
@@ -321,14 +315,8 @@ const RequestList = () => {
             </thead>
             <tbody>
               {filteredTransactions.map(transaction => {
-                let itemName = 'Desconhecido';
-                if (transaction.itemType === 'medication') {
-                  const medication = getMedicationById(transaction.itemId);
-                  itemName = medication ? medication.name : 'Desconhecido';
-                } else {
-                  const utensil = getUtensilById(transaction.itemId);
-                  itemName = utensil ? utensil.name : 'Desconhecido';
-                }
+                const medication = getMedicationById(transaction.medicationId);
+                const itemName = medication ? medication.name : 'Desconhecido';
                 
                 const sourceLocation = transaction.sourceLocationId 
                   ? getLocationById(transaction.sourceLocationId) 
@@ -352,12 +340,8 @@ const RequestList = () => {
                       </td>
                     )}
                     <td>
-                      <span className={`badge ${
-                        transaction.itemType === 'medication' 
-                          ? 'bg-primary-100 text-primary-800' 
-                          : 'bg-secondary-100 text-secondary-800'
-                      }`}>
-                        {transaction.itemType === 'medication' ? 'Medicamento' : 'Utensílio'}
+                      <span className="badge bg-primary-100 text-primary-800">
+                        Medicamento
                       </span>
                     </td>
                     <td className="font-medium">{itemName}</td>
@@ -418,24 +402,22 @@ const RequestList = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-gray-500">Tipo</p>
-                  <p className="font-medium">
-                    {selectedTransaction.itemType === 'medication' ? 'Medicamento' : 'Utensílio'}
-                  </p>
+                  <p className="font-medium">Medicamento</p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">Item</p>
                   <p className="font-medium">
-                    {selectedTransaction.itemType === 'medication'
-                      ? getMedicationById(selectedTransaction.itemId)?.name || 'Desconhecido'
-                      : getUtensilById(selectedTransaction.itemId)?.name || 'Desconhecido'}
-                  </p>
-                </div>
+                    {getMedicationById(selectedTransaction.medicationId)?.name || 'Desconhecido'}
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-gray-500">Quantidade</p>
                   <p className="font-medium">{selectedTransaction.quantity}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Tipo</p>
+                  <p className="font-medium">Medicamento</p>
                 </div>
               </div>
 
