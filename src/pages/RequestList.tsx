@@ -23,10 +23,16 @@ const RequestList = () => {
     // Get only distribution transactions
     let relevantTransactions = transactions.filter(t => t.type === 'distribution');
 
-    // If pharmacist, only show transactions related to their UBS
+    // Filter based on user role
     if (user?.role === 'pharmacist' && user.ubsId) {
+      // Pharmacist: only show transactions related to their UBS
       relevantTransactions = relevantTransactions.filter(
         t => t.sourceLocationId === user.ubsId || t.destinationLocationId === user.ubsId
+      );
+    } else if (user?.role === 'warehouse') {
+      // Warehouse: show approved transactions from warehouse (ready for delivery)
+      relevantTransactions = relevantTransactions.filter(
+        t => t.sourceLocationId === 'warehouse1' && t.status === 'approved'
       );
     }
 
@@ -747,10 +753,20 @@ const RequestList = () => {
 
               {(user?.role === 'admin' || user?.role === 'warehouse') && selectedTransaction.status === 'approved' && (
                 <div className="flex justify-end gap-3 mt-6">
+                  {user?.role === 'warehouse' && (
+                    <button
+                      onClick={handleDeliver}
+                      className="btn-success flex items-center gap-2"
+                    >
+                      <Download size={18} />
+                      <span>Entregar</span>
+                    </button>
+                  )}
                   <button
                     onClick={handleComplete}
-                    className="btn-primary"
+                    className="btn-primary flex items-center gap-2"
                   >
+                    <Check size={18} />
                     Marcar como Concluído
                   </button>
                 </div>

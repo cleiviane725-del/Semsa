@@ -469,12 +469,12 @@ export const MedicationProvider = ({ children }: MedicationProviderProps) => {
       )
     );
     
-    // If completed (released by warehouse), update stock levels
-    if (status === 'completed') {
+    // Update stock levels based on status
+    if (status === 'completed' || (status === 'approved' && user?.role === 'admin')) {
       if (transaction.sourceLocationId) {
         updateStock(
           transaction.medicationId,
-          'medication', // Default to medication for backward compatibility
+          'medication',
           transaction.sourceLocationId,
           -transaction.quantity
         );
@@ -483,7 +483,7 @@ export const MedicationProvider = ({ children }: MedicationProviderProps) => {
       if (transaction.destinationLocationId) {
         updateStock(
           transaction.medicationId,
-          'medication', // Default to medication for backward compatibility
+          'medication',
           transaction.destinationLocationId,
           transaction.quantity
         );
