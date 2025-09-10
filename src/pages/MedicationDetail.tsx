@@ -203,39 +203,20 @@ const MedicationDetail = () => {
       !distributeStock.destinationId
     ) return;
     
-    const sourceLocationId = user?.role === 'admin' ? 'warehouse1' : user?.ubsId;
-    if (!sourceLocationId) return;
-    
-    // Check if we have enough stock
-    const sourceLocation = stock.find(
-      item => item.medicationId === medication.id && item.locationId === sourceLocationId
-    );
-    
-    if (!sourceLocation || sourceLocation.quantity < distributeStock.quantity) {
-      addNotification({
-        type: 'error',
-        title: 'Estoque Insuficiente',
-        message: `Não há estoque suficiente para realizar esta distribuição.`,
-      });
-      return;
-    }
-    
+    // Para farmacêuticos, criar solicitação para o administrador
     addStockTransaction({
       type: 'distribution',
-      sourceLocationId,
-      destinationLocationId: distributeStock.destinationId,
+      sourceLocationId: 'warehouse1', // Sempre do almoxarifado
+      destinationLocationId: user?.ubsId || '',
       medicationId: medication.id,
       quantity: distributeStock.quantity,
       reason: distributeStock.reason,
-      status: user?.role === 'admin' ? 'completed' : 'pending',
     });
     
     addNotification({
-      type: 'info',
-      title: user?.role === 'admin' ? 'Distribuição Realizada' : 'Solicitação Enviada',
-      message: user?.role === 'admin' 
-        ? `${distributeStock.quantity} unidades de ${medication.name} foram distribuídas.`
-        : `Solicitação de ${distributeStock.quantity} unidades de ${medication.name} foi enviada para aprovação.`,
+      type: 'success',
+      title: 'Solicitação Enviada',
+      message: `Solicitação de ${distributeStock.quantity} unidades de ${medication.name} foi enviada com sucesso ao Administrador.`,
     });
     
     setShowDistributeModal(false);

@@ -188,7 +188,7 @@ const RequestList = () => {
     previewItems.forEach(item => {
       addStockTransaction({
         type: 'distribution',
-        sourceLocationId: user?.ubsId || '',
+        sourceLocationId: 'warehouse1', // Sempre do almoxarifado
         destinationLocationId: user?.ubsId || '',
         itemId: item.id,
         itemType: item.type,
@@ -199,8 +199,8 @@ const RequestList = () => {
     
     addNotification({
       type: 'success',
-      title: 'Solicitação Enviada',
-      message: `Solicitação de ${previewItems.length} itens enviada com sucesso ao Administrador.`,
+      title: 'Solicitações Enviadas',
+      message: `${previewItems.length} solicitações foram enviadas com sucesso ao Administrador.`,
     });
     
     setShowBulkRequestModal(false);

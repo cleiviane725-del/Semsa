@@ -211,40 +211,21 @@ const UtensilDetail = () => {
       !distributeStock.destinationId
     ) return;
     
-    const sourceLocationId = user?.role === 'admin' ? 'warehouse1' : user?.ubsId;
-    if (!sourceLocationId) return;
-    
-    // Check if we have enough stock
-    const sourceLocation = stock.find(
-      item => item.itemId === utensil.id && item.itemType === 'utensil' && item.locationId === sourceLocationId
-    );
-    
-    if (!sourceLocation || sourceLocation.quantity < distributeStock.quantity) {
-      addNotification({
-        type: 'error',
-        title: 'Estoque Insuficiente',
-        message: `Não há estoque suficiente para realizar esta distribuição.`,
-      });
-      return;
-    }
-    
+    // Para farmacêuticos, criar solicitação para o administrador
     addStockTransaction({
       type: 'distribution',
-      sourceLocationId,
-      destinationLocationId: distributeStock.destinationId,
+      sourceLocationId: 'warehouse1', // Sempre do almoxarifado
+      destinationLocationId: user?.ubsId || '',
       itemId: utensil.id,
       itemType: 'utensil',
       quantity: distributeStock.quantity,
       reason: distributeStock.reason,
-      status: user?.role === 'admin' ? 'completed' : 'pending',
     });
     
     addNotification({
-      type: 'info',
-      title: user?.role === 'admin' ? 'Distribuição Realizada' : 'Solicitação Enviada',
-      message: user?.role === 'admin' 
-        ? `${distributeStock.quantity} unidades de ${utensil.name} foram distribuídas.`
-        : `Solicitação de ${distributeStock.quantity} unidades de ${utensil.name} foi enviada para aprovação.`,
+      type: 'success',
+      title: 'Solicitação Enviada',
+      message: `Solicitação de ${distributeStock.quantity} unidades de ${utensil.name} foi enviada com sucesso ao Administrador.`,
     });
     
     setShowDistributeModal(false);
