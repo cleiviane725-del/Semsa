@@ -246,6 +246,20 @@ export const MedicationProvider = ({ children }: MedicationProviderProps) => {
     };
     
     setMedications(prev => [...prev, newMedication]);
+    
+    // Add initial stock to warehouse
+    if (medicationData.quantity > 0) {
+      const newStockItem: StockItem = {
+        id: uuidv4(),
+        itemId: newMedication.id,
+        itemType: 'medication',
+        locationId: 'warehouse1',
+        quantity: medicationData.quantity,
+        updatedAt: now,
+      };
+      setStock(prev => [...prev, newStockItem]);
+    }
+    
     return newMedication.id;
   };
 
@@ -260,6 +274,20 @@ export const MedicationProvider = ({ children }: MedicationProviderProps) => {
     };
     
     setUtensils(prev => [...prev, newUtensil]);
+    
+    // Add initial stock to warehouse
+    if (utensilData.quantity > 0) {
+      const newStockItem: StockItem = {
+        id: uuidv4(),
+        itemId: newUtensil.id,
+        itemType: 'utensil',
+        locationId: 'warehouse1',
+        quantity: utensilData.quantity,
+        updatedAt: now,
+      };
+      setStock(prev => [...prev, newStockItem]);
+    }
+    
     return newUtensil.id;
   };
 
@@ -321,14 +349,134 @@ export const MedicationProvider = ({ children }: MedicationProviderProps) => {
       ...transactionData,
       id: uuidv4(),
       requestDate: now,
-      status: 'pending',
+      status: transactionData.type === 'receipt' || transactionData.type === 'damaged' ? 'completed' : 'pending',
       requestedBy: user?.id || 'unknown',
     };
     
     setTransactions(prev => [...prev, newTransaction]);
     
-    // If it's a damaged item report, process it immediately
-    if (transactionData.type === 'damaged' && transactionData.sourceLocationId) {
+    // Process certain transactions immediately
+    if ((transactionData.type === 'receipt' || transactionData.type === 'damaged') && newTransaction.status === 'completed') {
+      if (transactionData.type === 'receipt' && transactionData.destinationLocationId) {
+        updateStock(
+          transactionData.itemId,
+          transactionData.itemType,
+          transactionData.destinationLocationId,
+          transactionData.quantity
+        );
+      } else if (transactionData.type === 'damaged' && transactionData.sourceLocationId) {
+        updateStock(
+          transactionData.itemId,
+          transactionData.itemType,
+          transactionData.sourceLocationId,
+          -transactionData.quantity
+        );
+      }
+    }
+    
+    // If admin is making a distribution, complete it immediately
+    if (transactionData.type === 'distribution' && user?.role === 'admin') {
+      newTransaction.status = 'completed';
+      newTransaction.processedBy = user.id;
+      newTransaction.processDate = now;
+      
+      // Update stock immediately for admin distributions
+      if (transactionData.sourceLocationId) {
+        updateStock(
+          transactionData.itemId,
+          transactionData.itemType,
+          transactionData.sourceLocationId,
+          -transactionData.quantity
+        );
+      }
+      
+      if (transactionData.destinationLocationId) {
+        updateStock(
+          transactionData.itemId,
+          transactionData.itemType,
+          transactionData.destinationLocationId,
+          transactionData.quantity
+        );
+      }
+    }
+    
+    return newTransaction.id;
+  };
+
+  // Update the status of a transaction
+  const updateTransactionStatus = (
+    id: string, 
+    status: 'approved' | 'rejected' | 'completed',
+    processedBy: string
+  ): void => {
+    const transaction = transactions.find(t => t.id === id);
+    if (!transaction) return;
+    
+    const now = new Date().toISOString();
+    
+    setTransactions(prev => 
+      prev.map(t => 
+        t.id === id 
+          ? { ...t, status, processedBy, processDate: now } 
+          : t
+      )
+    );
+    
+    // If completed (released by warehouse), update stock levels
+    if (status === 'completed') {
+      if (transaction.sourceLocationId) {
+        updateStock(
+          transaction.itemId,
+          transaction.itemType,
+          transaction.sourceLocationId,
+          -transaction.quantity
+        );
+      }
+      
+      if (transaction.destinationLocationId) {
+        updateStock(
+          transaction.itemId,
+          transaction.itemType,
+          transaction.destinationLocationId,
+          transaction.quantity
+        );
+      }
+    }
+  };
+
+  // Helper function to update stock levels
+  const updateStock = (itemId: string, itemType: 'medication' | 'utensil', locationId: string, quantityChange: number): void => {
+    const existingStockItem = stock.find(
+      item => item.itemId === itemId && item.itemType === itemType && item.locationId === locationId
+    );
+    
+    if (existingStockItem) {
+      // Update existing stock
+      setStock(prev => 
+        prev.map(item => 
+          item.id === existingStockItem.id
+            ? { 
+                ...item, 
+                quantity: Math.max(0, item.quantity + quantityChange),
+                updatedAt: new Date().toISOString() 
+              }
+            : item
+        )
+      );
+    } else if (quantityChange > 0) {
+      // Create new stock entry if it's an addition
+      const newStockItem: StockItem = {
+        id: uuidv4(),
+        itemId,
+        itemType,
+        locationId,
+        quantity: quantityChange,
+        updatedAt: new Date().toISOString(),
+      };
+      
+      setStock(prev => [...prev, newStockItem]);
+    }
+  };
       updateStock(
         transactionData.itemId,
         transactionData.itemType,

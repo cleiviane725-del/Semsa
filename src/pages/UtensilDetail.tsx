@@ -194,7 +194,7 @@ const UtensilDetail = () => {
     addNotification({
       type: 'success',
       title: 'Estoque Recebido',
-      message: `${receiveStock.quantity} unidades de ${utensil.name} foram adicionadas ao estoque.`,
+      message: `${receiveStock.quantity} unidades de ${utensil.name} foram recebidas e adicionadas ao estoque do almoxarifado.`,
     });
     
     setShowReceiveModal(false);

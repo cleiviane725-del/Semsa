@@ -120,9 +120,10 @@ export const NotificationProvider = ({ children }: NotificationProviderProps) =>
 
   // Check for medications with low stock
   const checkLowStock = () => {
+    // Check medications
     medications.forEach(medication => {
       const totalStock = stock
-        .filter(item => item.medicationId === medication.id)
+        .filter(item => item.itemId === medication.id && item.itemType === 'medication')
         .reduce((sum, item) => sum + item.quantity, 0);
       
       if (totalStock <= medication.minimumStock) {
@@ -130,6 +131,22 @@ export const NotificationProvider = ({ children }: NotificationProviderProps) =>
           type: 'warning',
           title: 'Estoque Baixo',
           message: `${medication.name} está com estoque baixo (${totalStock} unidades). Mínimo recomendado: ${medication.minimumStock}.`,
+        });
+      }
+    });
+    
+    // Check utensils
+    const { utensils } = useMedication();
+    utensils.forEach(utensil => {
+      const totalStock = stock
+        .filter(item => item.itemId === utensil.id && item.itemType === 'utensil')
+        .reduce((sum, item) => sum + item.quantity, 0);
+      
+      if (totalStock <= utensil.minimumStock) {
+        addNotification({
+          type: 'warning',
+          title: 'Estoque Baixo - Utensílio',
+          message: `${utensil.name} está com estoque baixo (${totalStock} unidades). Mínimo recomendado: ${utensil.minimumStock}.`,
         });
       }
     });

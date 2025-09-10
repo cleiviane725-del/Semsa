@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Package, Search, Filter, Plus, ArrowDown, ArrowUp, AlertTriangle, Check, X, Truck } from 'lucide-react';
+import { Package, Search, Filter, Plus, ArrowDown, ArrowUp, AlertTriangle, Check, X, Truck, Bell } from 'lucide-react';
 import { useMedication } from '../hooks/useMedication';
 import { useAuth } from '../hooks/useAuth';
 import { useNotification } from '../hooks/useNotification';
@@ -61,7 +61,7 @@ const Inventory = () => {
     addNotification({
       type: 'success',
       title: 'Distribuição Concluída',
-      message: `A distribuição foi processada e concluída com sucesso.`,
+      message: `A distribuição foi liberada e processada com sucesso. O estoque foi atualizado automaticamente.`,
     });
     
     setShowProcessModal(false);

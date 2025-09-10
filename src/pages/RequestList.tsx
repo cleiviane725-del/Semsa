@@ -75,7 +75,7 @@ const RequestList = () => {
       addNotification({
         type: 'success',
         title: 'Solicitação Aprovada',
-        message: `A solicitação foi aprovada com sucesso.`,
+        message: `A solicitação foi aprovada e enviada para o almoxarifado para liberação.`,
       });
       
       setShowModal(false);
@@ -103,7 +103,7 @@ const RequestList = () => {
       addNotification({
         type: 'success',
         title: 'Solicitação Concluída',
-        message: `A solicitação foi concluída com sucesso.`,
+        message: `A solicitação foi liberada com sucesso. O estoque foi atualizado automaticamente.`,
       });
       
       setShowModal(false);
