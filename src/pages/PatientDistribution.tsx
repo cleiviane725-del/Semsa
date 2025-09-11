@@ -30,6 +30,7 @@ const PatientDistribution: React.FC = () => {
   });
   const [showModal, setShowModal] = useState(false);
   const [notification, setNotification] = useState<{type: 'success' | 'error', message: string} | null>(null);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   // Get available medications in this UBS
   const availableMedications = React.useMemo(() => {
@@ -63,7 +64,7 @@ const PatientDistribution: React.FC = () => {
         med.manufacturer.toLowerCase().includes(searchTerm.toLowerCase()) ||
         med.category.toLowerCase().includes(searchTerm.toLowerCase())
       );
-  }, [user?.ubsId, stock, medications, searchTerm]);
+  }, [user?.ubsId, stock, medications, searchTerm, refreshTrigger]);
 
   const handleDispenseMedication = () => {
     if (!selectedMedication || !user?.ubsId) return;
@@ -120,6 +121,9 @@ const PatientDistribution: React.FC = () => {
     });
     setShowModal(false);
     setSelectedMedication(null);
+    
+    // Force refresh of available medications
+    setRefreshTrigger(prev => prev + 1);
   };
 
   const openDispenseModal = (medication: any) => {

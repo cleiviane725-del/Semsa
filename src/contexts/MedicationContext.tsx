@@ -373,6 +373,10 @@ export const MedicationProvider = ({ children }: MedicationProviderProps) => {
       }
       
       console.log('📦 Updated stock array:', updatedStock);
+      
+      // Force localStorage update
+      localStorage.setItem('med_stock', JSON.stringify(updatedStock));
+      
       return updatedStock;
     });
   };
@@ -431,12 +435,16 @@ export const MedicationProvider = ({ children }: MedicationProviderProps) => {
           sourceLocationId: transactionData.sourceLocationId,
           quantity: transactionData.quantity
         });
-        updateStock(
-          itemId,
-          itemType,
-          transactionData.sourceLocationId,
-          -transactionData.quantity
-        );
+        
+        // Force immediate stock update for patient transactions
+        setTimeout(() => {
+          updateStock(
+            itemId,
+            itemType,
+            transactionData.sourceLocationId,
+            -transactionData.quantity
+          );
+        }, 100);
       }
     }
     
