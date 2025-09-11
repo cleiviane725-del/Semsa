@@ -428,17 +428,7 @@ export const MedicationProvider = ({ children }: MedicationProviderProps) => {
           ? { ...t, status, processedBy, processDate: now } 
           : t
       )
-      item => item.itemId === selectedMedication.id && 
-             item.itemType === 'medication' && 
-             item.locationId === user.ubsId
     );
-    
-    console.log('🔍 Checking stock for dispensing:', {
-      medicationId: selectedMedication.id,
-      ubsId: user.ubsId,
-      requestedQuantity: patientInfo.quantity,
-      availableStock: stockItem?.quantity || 0
-    });
     
     // Update stock levels based on status
     if (status === 'approved') {
