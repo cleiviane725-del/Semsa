@@ -56,7 +56,7 @@ const PatientDistribution: React.FC = () => {
           ...medication,
           availableQuantity: stockItem.quantity
         };
-      }))
+      })
       .filter(med => med !== null)
       .filter(med => 
         med.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
