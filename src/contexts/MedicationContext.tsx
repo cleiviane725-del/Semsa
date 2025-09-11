@@ -349,6 +349,25 @@ export const MedicationProvider = ({ children }: MedicationProviderProps) => {
   const updateStock = (itemId: string, itemType: 'medication' | 'utensil', locationId: string, quantityChange: number): void => {
     console.log('🔄 Updating stock:', { itemId, itemType, locationId, quantityChange });
     
+    setStock(prevStock => {
+      const updatedStock = prevStock.map(stockItem => {
+        if (stockItem.itemId === itemId && 
+            stockItem.itemType === itemType && 
+            stockItem.locationId === locationId) {
+          const newQuantity = Math.max(0, stockItem.quantity + quantityChange);
+          console.log(`📊 Stock updated: ${stockItem.quantity} → ${newQuantity}`);
+          return {
+            ...stockItem,
+            quantity: newQuantity,
+            updatedAt: new Date().toISOString()
+          };
+        }
+        return stockItem;
+      });
+      
+      console.log('📦 Updated stock array:', updatedStock);
+      return updatedStock;
+    });
   };
 
   // Add a new stock transaction (receipt, distribution, etc.)
@@ -452,6 +471,18 @@ export const MedicationProvider = ({ children }: MedicationProviderProps) => {
           itemType,
           transaction.destinationLocationId,
           transaction.quantity
+        );
+      }
+    } else if (status === 'completed') {
+      console.log('✅ Processing completed transaction:', transaction.type);
+      
+      if (transaction.type === 'patient' && transaction.sourceLocationId) {
+        console.log('👤 Reducing stock for patient dispensation');
+        updateStock(
+          transaction.medicationId,
+          itemType,
+          transaction.sourceLocationId,
+          -transaction.quantity
         );
       }
     }
