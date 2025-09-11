@@ -168,7 +168,7 @@ const MedicationList = () => {
             </thead>
             <tbody>
               {filteredMedications.map(medication => {
-                const totalStock = getTotalStock(medication.id);
+                const totalStock = getTotalStock(medication.id, 'medication');
                 const isLowStock = totalStock <= medication.minimumStock;
                 const daysUntilExpiry = differenceInDays(
                   new Date(medication.expiryDate),
