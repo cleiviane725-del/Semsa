@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Users, Search, Package, Calendar, User, Badge } from 'lucide-react';
+import { Users, Search, Package, Calendar, User, Badge, AlertTriangle, Pill, Thermometer } from 'lucide-react';
 import { useMedication } from '../hooks/useMedication';
 import { useAuth } from '../hooks/useAuth';
 import { useNotification } from '../hooks/useNotification';
+import { differenceInDays } from 'date-fns';
 
 const PatientDistribution = () => {
   const { medications, stock, addStockTransaction } = useMedication();
@@ -123,65 +124,137 @@ const PatientDistribution = () => {
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Dispensação para Pacientes</h1>
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Dispensação para Pacientes</h1>
+          <p className="text-gray-600 mt-1">Selecione um medicamento disponível para dispensar ao paciente</p>
+        </div>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1">
           <input
             type="text"
-            placeholder="Buscar medicamentos disponíveis..."
+            placeholder="Buscar por nome, fabricante ou categoria..."
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
             className="input pl-10"
           />
           <Search className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
         </div>
+        <div className="flex items-center gap-2 text-sm text-gray-600">
+          <Package size={16} />
+          <span>{filteredMedications.length} medicamentos disponíveis</span>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {filteredMedications.map(medication => {
           const availableQuantity = getAvailableQuantity(medication.id);
+          const daysUntilExpiry = differenceInDays(
+            new Date(medication.expiryDate),
+            new Date()
+          );
+          const isExpiringSoon = daysUntilExpiry >= 0 && daysUntilExpiry <= 30;
+          const isExpired = daysUntilExpiry < 0;
           
           return (
             <div 
               key={medication.id}
-              className="card cursor-pointer hover:shadow-md transition-shadow"
+              className="card cursor-pointer hover:shadow-lg hover:scale-105 transition-all duration-200 border-l-4 border-primary-500"
               onClick={() => handleSelectMedication(medication)}
             >
-              <div className="flex justify-between items-start">
-                <div className="flex flex-col">
-                  <h3 className="font-semibold text-lg">{medication.name}</h3>
-                  <p className="text-gray-600 text-sm">{medication.manufacturer}</p>
-                  <span className="badge bg-primary-100 text-primary-800 mt-2">
+              <div className="space-y-3">
+                {/* Header com nome e fabricante */}
+                <div>
+                  <h3 className="font-bold text-lg text-gray-900 mb-1">{medication.name}</h3>
+                  <p className="text-gray-600 text-sm font-medium">{medication.manufacturer}</p>
+                </div>
+
+                {/* Badges de categoria e status */}
+                <div className="flex flex-wrap gap-2">
+                  <span className="badge bg-primary-100 text-primary-800 text-xs">
                     {medication.category}
                   </span>
+                  {medication.storageType === 'refrigerated' && (
+                    <span className="badge bg-blue-100 text-blue-800 text-xs flex items-center gap-1">
+                      <Thermometer size={12} />
+                      Refrigerado
+                    </span>
+                  )}
+                  {medication.storageType === 'controlled' && (
+                    <span className="badge bg-warning-100 text-warning-800 text-xs flex items-center gap-1">
+                      <Pill size={12} />
+                      Controlado
+                    </span>
+                  )}
+                  {isExpired && (
+                    <span className="badge bg-danger-100 text-danger-800 text-xs">
+                      Vencido
+                    </span>
+                  )}
+                  {isExpiringSoon && !isExpired && (
+                    <span className="badge bg-warning-100 text-warning-800 text-xs">
+                      Vence em {daysUntilExpiry} dias
+                    </span>
+                  )}
                 </div>
-                <div className="text-right">
-                  <div className="bg-success-50 text-success-700 py-1 px-2 rounded font-medium">
-                    {availableQuantity} disponíveis
+
+                {/* Informações de estoque */}
+                <div className="bg-gray-50 rounded-lg p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium text-gray-700">Estoque Disponível</span>
+                    <div className={`px-3 py-1 rounded-full text-sm font-bold ${
+                      availableQuantity > medication.minimumStock 
+                        ? 'bg-success-100 text-success-700' 
+                        : availableQuantity > 0 
+                        ? 'bg-warning-100 text-warning-700'
+                        : 'bg-danger-100 text-danger-700'
+                    }`}>
+                      {availableQuantity} unidades
+                    </div>
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Clique para dispensar
-                  </p>
+                  {availableQuantity <= medication.minimumStock && availableQuantity > 0 && (
+                    <div className="flex items-center gap-1 text-warning-600 text-xs">
+                      <AlertTriangle size={12} />
+                      <span>Estoque baixo (mín: {medication.minimumStock})</span>
+                    </div>
+                  )}
                 </div>
-              </div>
-              <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between text-sm">
-                <div className="flex items-center gap-1 text-gray-600">
-                  <Package size={16} />
-                  <span>Lote: {medication.batch}</span>
+
+                {/* Informações do lote e validade */}
+                <div className="space-y-2 text-xs text-gray-600">
+                  <div className="flex items-center gap-2">
+                    <Package size={14} className="text-gray-400" />
+                    <span><strong>Lote:</strong> {medication.batch}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Calendar size={14} className="text-gray-400" />
+                    <span className={isExpired ? 'text-danger-600 font-medium' : isExpiringSoon ? 'text-warning-600 font-medium' : ''}>
+                      <strong>Validade:</strong> {new Date(medication.expiryDate).toLocaleDateString()}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-1 text-gray-600">
-                  <Calendar size={16} />
-                  <span>Validade: {new Date(medication.expiryDate).toLocaleDateString()}</span>
+
+                {/* Botão de ação */}
+                <div className="pt-2 border-t border-gray-100">
+                  <div className="flex items-center justify-center gap-2 text-primary-600 font-medium text-sm">
+                    <Users size={16} />
+                    <span>Clique para Dispensar</span>
+                  </div>
                 </div>
               </div>
             </div>
           );
         })}
         {filteredMedications.length === 0 && (
-          <div className="col-span-full text-center py-8 text-gray-500">
-            Nenhum medicamento disponível para dispensação
+          <div className="col-span-full text-center py-12">
+            <div className="bg-gray-50 rounded-lg p-8">
+              <Package className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">Nenhum medicamento disponível</h3>
+              <p className="text-gray-500">
+                Não há medicamentos em estoque nesta UBS para dispensação no momento.
+              </p>
+            </div>
           </div>
         )}
       </div>
@@ -191,15 +264,25 @@ const PatientDistribution = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 animate-fade-in">
           <div className="bg-white rounded-lg shadow-xl max-w-md mx-auto p-6 w-full">
             <div className="mb-4">
-              <h3 className="text-xl font-bold">Dispensar para Paciente</h3>
-              <p className="text-gray-600 mt-1">
-                {selectedMedication.name} ({selectedMedication.manufacturer})
-              </p>
+              <div className="flex items-start gap-3">
+                <div className="p-2 bg-primary-100 rounded-lg">
+                  <Pill className="h-6 w-6 text-primary-600" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900">Dispensar Medicamento</h3>
+                  <p className="text-gray-600 mt-1">
+                    <strong>{selectedMedication.name}</strong> - {selectedMedication.manufacturer}
+                  </p>
+                  <p className="text-sm text-gray-500">
+                    Lote: {selectedMedication.batch} | Categoria: {selectedMedication.category}
+                  </p>
+                </div>
+              </div>
             </div>
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
                   Número do SUS ou CPF do Paciente
                 </label>
                 <div className="mt-1 relative">
@@ -209,6 +292,7 @@ const PatientDistribution = () => {
                     value={patientInfo.id}
                     onChange={handlePatientInfoChange}
                     className="input pl-10"
+                    placeholder="Digite o número do SUS ou CPF"
                     required
                   />
                   <Badge className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
@@ -216,7 +300,7 @@ const PatientDistribution = () => {
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-700">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
                   Nome do Paciente
                 </label>
                 <div className="mt-1 relative">
@@ -226,6 +310,7 @@ const PatientDistribution = () => {
                     value={patientInfo.name}
                     onChange={handlePatientInfoChange}
                     className="input pl-10"
+                    placeholder="Nome completo do paciente"
                     required
                   />
                   <User className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
@@ -233,26 +318,31 @@ const PatientDistribution = () => {
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-700">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
                   Quantidade a Dispensar
                 </label>
-                <input
-                  type="number"
-                  name="quantity"
-                  value={patientInfo.quantity}
-                  onChange={handlePatientInfoChange}
-                  className="input mt-1"
-                  min="1"
-                  max={getAvailableQuantity(selectedMedication.id)}
-                  required
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Disponível: {getAvailableQuantity(selectedMedication.id)} unidades
-                </p>
+                <div className="flex gap-3">
+                  <input
+                    type="number"
+                    name="quantity"
+                    value={patientInfo.quantity}
+                    onChange={handlePatientInfoChange}
+                    className="input flex-1"
+                    min="1"
+                    max={getAvailableQuantity(selectedMedication.id)}
+                    placeholder="Qtd"
+                    required
+                  />
+                  <div className="flex items-center px-3 py-2 bg-gray-50 rounded-md border">
+                    <span className="text-sm text-gray-600">
+                      de {getAvailableQuantity(selectedMedication.id)} disponíveis
+                    </span>
+                  </div>
+                </div>
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-700">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
                   Observações (opcional)
                 </label>
                 <textarea
@@ -261,6 +351,7 @@ const PatientDistribution = () => {
                   onChange={handlePatientInfoChange}
                   className="input mt-1"
                   rows={3}
+                  placeholder="Observações sobre a dispensação..."
                 />
               </div>
               
@@ -273,7 +364,7 @@ const PatientDistribution = () => {
                 </button>
                 <button
                   onClick={handleDistributeToPatient}
-                  className="btn-primary"
+                  className="btn-primary flex items-center gap-2"
                   disabled={
                     !patientInfo.id || 
                     !patientInfo.name || 
@@ -281,6 +372,7 @@ const PatientDistribution = () => {
                     patientInfo.quantity > getAvailableQuantity(selectedMedication.id)
                   }
                 >
+                  <Users size={18} />
                   Dispensar Medicamento
                 </button>
               </div>
