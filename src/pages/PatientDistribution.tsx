@@ -1,90 +1,434 @@
-import { useState, useEffect } from 'react';
-import { Users, Search, Package, Calendar, User, Badge, AlertTriangle, Pill, Thermometer } from 'lucide-react';
-import { useMedication } from '../hooks/useMedication';
+import { createContext, useState, useEffect, ReactNode } from 'react';
+import { v4 as uuidv4 } from 'uuid';
+import { addDays } from 'date-fns';
 import { useAuth } from '../hooks/useAuth';
-import { useNotification } from '../hooks/useNotification';
-import { differenceInDays } from 'date-fns';
 
-const PatientDistribution = () => {
-  const { medications, stock, addStockTransaction } = useMedication();
-  const { user } = useAuth();
-  const { addNotification } = useNotification();
-  const [searchTerm, setSearchTerm] = useState('');
-  const [showModal, setShowModal] = useState(false);
-  const [selectedMedication, setSelectedMedication] = useState<any>(null);
-  const [filteredMedications, setFilteredMedications] = useState<any[]>([]);
+export interface Medication {
+  id: string;
+  name: string;
+  manufacturer: string;
+  batch: string;
+  expiryDate: string;
+  quantity: number;
+  minimumStock: number;
+  storageType: 'room' | 'refrigerated' | 'controlled';
+  category: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Utensil {
+  id: string;
+  name: string;
+  manufacturer: string;
+  batch: string;
+  expiryDate?: string;
+  quantity: number;
+  minimumStock: number;
+  storageType: 'room' | 'refrigerated' | 'controlled';
+  category: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface StockLocation {
+  id: string;
+  name: string;
+  type: 'warehouse' | 'ubs';
+}
+
+export interface StockItem {
+  id: string;
+  itemId: string;
+  itemType: 'medication' | 'utensil';
+  locationId: string;
+  quantity: number;
+  updatedAt: string;
+}
+
+export interface StockTransaction {
+  id: string;
+  type: 'receipt' | 'distribution' | 'patient' | 'damaged';
+  sourceLocationId: string | null;
+  destinationLocationId: string | null;
+  medicationId: string;
+  itemType?: 'medication' | 'utensil';
+  quantity: number;
+  reason: string;
+  patientId?: string;
+  patientName?: string;
+  status: 'pending' | 'approved' | 'rejected' | 'completed';
+  requestedBy: string;
+  processedBy?: string;
+  requestDate: string;
+  processDate?: string;
+}
+
+export interface DamagedItem {
+  id: string;
+  itemId: string;
+  itemType: 'medication' | 'utensil';
+  locationId: string;
+  quantity: number;
+  batch: string;
+  reason: string;
+  reportedBy: string;
+  reportDate: string;
+}
+
+interface MedicationContextType {
+  medications: Medication[];
+  utensils: Utensil[];
+  locations: StockLocation[];
+  stock: StockItem[];
+  transactions: StockTransaction[];
+  damagedItems: DamagedItem[];
   
-  const [patientInfo, setPatientInfo] = useState({
-    id: '',
-    name: '',
-    quantity: 0,
-    notes: '',
-  });
+  addMedication: (medication: Omit<Medication, 'id' | 'createdAt' | 'updatedAt'>) => string;
+  updateMedication: (medication: Medication) => void;
+  getMedicationById: (id: string) => Medication | undefined;
+  
+  addUtensil: (utensil: Omit<Utensil, 'id' | 'createdAt' | 'updatedAt'>) => string;
+  updateUtensil: (utensil: Utensil) => void;
+  getUtensilById: (id: string) => Utensil | undefined;
+  
+  addStockTransaction: (transaction: Omit<StockTransaction, 'id' | 'requestDate' | 'status' | 'requestedBy'>) => string;
+  updateTransactionStatus: (id: string, status: 'approved' | 'rejected' | 'completed', processedBy: string) => void;
+  getTransactionsByLocation: (locationId: string | null) => StockTransaction[];
+  
+  getLocationStock: (locationId: string) => Array<{item: Medication | Utensil, itemType: 'medication' | 'utensil', quantity: number}>;
+  getTotalStock: (itemId: string, itemType: 'medication' | 'utensil') => number;
+  getLocationById: (id: string) => StockLocation | undefined;
+  
+  reportDamagedItem: (damagedItem: Omit<DamagedItem, 'id' | 'reportDate'>) => string;
+  generatePDF: (transactionIds: string[]) => void;
+}
+
+export const MedicationContext = createContext<MedicationContextType>({
+  medications: [],
+  utensils: [],
+  locations: [],
+  stock: [],
+  transactions: [],
+  damagedItems: [],
+  
+  addMedication: () => '',
+  updateMedication: () => {},
+  getMedicationById: () => undefined,
+  
+  addUtensil: () => '',
+  updateUtensil: () => {},
+  getUtensilById: () => undefined,
+  
+  addStockTransaction: () => '',
+  updateTransactionStatus: () => {},
+  getTransactionsByLocation: () => [],
+  
+  getLocationStock: () => [],
+  getTotalStock: () => 0,
+  getLocationById: () => undefined,
+  
+  reportDamagedItem: () => '',
+  generatePDF: () => {},
+});
+
+interface MedicationProviderProps {
+  children: ReactNode;
+}
+
+export const MedicationProvider = ({ children }: MedicationProviderProps) => {
+  const { user } = useAuth();
+  
+  const [medications, setMedications] = useState<Medication[]>([]);
+  const [utensils, setUtensils] = useState<Utensil[]>([]);
+  const [locations, setLocations] = useState<StockLocation[]>([]);
+  const [stock, setStock] = useState<StockItem[]>([]);
+  const [transactions, setTransactions] = useState<StockTransaction[]>([]);
+  const [damagedItems, setDamagedItems] = useState<DamagedItem[]>([]);
+
+  // Load data from localStorage on first render
+  useEffect(() => {
+    const loadData = () => {
+      const storedMedications = localStorage.getItem('med_medications');
+      if (storedMedications) {
+        setMedications(JSON.parse(storedMedications));
+      }
+
+      const storedUtensils = localStorage.getItem('med_utensils');
+      if (storedUtensils) {
+        setUtensils(JSON.parse(storedUtensils));
+      }
+
+      const storedLocations = localStorage.getItem('med_locations');
+      if (storedLocations) {
+        setLocations(JSON.parse(storedLocations));
+      }
+
+      const storedStock = localStorage.getItem('med_stock');
+      if (storedStock) {
+        setStock(JSON.parse(storedStock));
+      }
+
+      const storedTransactions = localStorage.getItem('med_transactions');
+      if (storedTransactions) {
+        setTransactions(JSON.parse(storedTransactions));
+      }
+
+      const storedDamagedItems = localStorage.getItem('med_damagedItems');
+      if (storedDamagedItems) {
+        setDamagedItems(JSON.parse(storedDamagedItems));
+      }
+    };
+
+    loadData();
+  }, []);
+
+  // Persist data to localStorage whenever it changes
+  useEffect(() => {
+    if (medications.length > 0) {
+      localStorage.setItem('med_medications', JSON.stringify(medications));
+    }
+  }, [medications]);
 
   useEffect(() => {
-    if (!user?.ubsId) return;
-    
-    // Get all medications available at this UBS
-    const availableMedications = medications.filter(med => {
-      const stockItem = stock.find(
-        item => item.itemId === med.id && item.itemType === 'medication' && item.locationId === user.ubsId
-      );
-      console.log(`🔍 Checking medication ${med.name} at UBS ${user.ubsId}:`, stockItem);
-      return stockItem && stockItem.quantity > 0;
-    });
-    
-    console.log(`📋 Available medications for UBS ${user.ubsId}:`, availableMedications.length);
-    
-    // Apply search filter
-    if (searchTerm) {
-      const filtered = availableMedications.filter(med => 
-        med.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        med.manufacturer.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        med.category.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-      setFilteredMedications(filtered);
-    } else {
-      setFilteredMedications(availableMedications);
+    if (utensils.length > 0) {
+      localStorage.setItem('med_utensils', JSON.stringify(utensils));
     }
-  }, [medications, stock, searchTerm, user]);
+  }, [utensils]);
 
-  const handleSelectMedication = (medication: any) => {
-    setSelectedMedication(medication);
-    setShowModal(true);
-    setPatientInfo({
-      id: '',
-      name: '',
-      quantity: 1,
-      notes: '',
-    });
+  useEffect(() => {
+    if (locations.length > 0) {
+      localStorage.setItem('med_locations', JSON.stringify(locations));
+    }
+  }, [locations]);
+
+  useEffect(() => {
+    if (stock.length > 0) {
+      localStorage.setItem('med_stock', JSON.stringify(stock));
+    }
+  }, [stock]);
+
+  useEffect(() => {
+    if (transactions.length > 0) {
+      localStorage.setItem('med_transactions', JSON.stringify(transactions));
+    }
+  }, [transactions]);
+
+  useEffect(() => {
+    if (damagedItems.length > 0) {
+      localStorage.setItem('med_damagedItems', JSON.stringify(damagedItems));
+    }
+  }, [damagedItems]);
+
+  // Helper function to get medication by ID
+  const getMedicationById = (id: string): Medication | undefined => {
+    return medications.find(med => med.id === id);
   };
 
-  const handlePatientInfoChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setPatientInfo(prev => ({
-      ...prev,
-      [name]: name === 'quantity' ? parseInt(value) || 0 : value,
-    }));
+  // Helper function to get utensil by ID
+  const getUtensilById = (id: string): Utensil | undefined => {
+    return utensils.find(utensil => utensil.id === id);
   };
 
-  const handleDistributeToPatient = () => {
-    if (
-      !selectedMedication || 
-      !user?.ubsId || 
-      !patientInfo.id || 
-      !patientInfo.name || 
-      patientInfo.quantity <= 0
-    ) {
-      addNotification({
-        type: 'error',
-        title: 'Dados Incompletos',
+  // Helper function to get location by ID
+  const getLocationById = (id: string): StockLocation | undefined => {
+    return locations.find(loc => loc.id === id);
+  };
+
+  // Add a new medication to the system
+  const addMedication = (medicationData: Omit<Medication, 'id' | 'createdAt' | 'updatedAt'>): string => {
+    const now = new Date().toISOString();
+    const newMedication: Medication = {
+      ...medicationData,
+      id: uuidv4(),
+      createdAt: now,
+      updatedAt: now,
+    };
+    
+    setMedications(prev => [...prev, newMedication]);
+    
+    // Add initial stock to warehouse
+    if (medicationData.quantity > 0) {
+      console.log('🏥 Adding initial stock for new medication:', newMedication.name, 'quantity:', medicationData.quantity);
+      const newStockItem: StockItem = {
+        id: uuidv4(),
+        itemId: newMedication.id,
+        itemType: 'medication',
+        locationId: 'warehouse1',
+        quantity: medicationData.quantity,
+        updatedAt: now,
+      };
+      setStock(prev => [...prev, newStockItem]);
+    }
+    
+    return newMedication.id;
+  };
+
+  // Add a new utensil to the system
+  const addUtensil = (utensilData: Omit<Utensil, 'id' | 'createdAt' | 'updatedAt'>): string => {
+    const now = new Date().toISOString();
+    const newUtensil: Utensil = {
+      ...utensilData,
+      id: uuidv4(),
+      createdAt: now,
+      updatedAt: now,
+    };
+    
+    setUtensils(prev => [...prev, newUtensil]);
+    
+    // Add initial stock to warehouse
+    if (utensilData.quantity > 0) {
+      const newStockItem: StockItem = {
+        id: uuidv4(),
+        itemId: newUtensil.id,
+        itemType: 'utensil',
+        locationId: 'warehouse1',
+        quantity: utensilData.quantity,
+        updatedAt: now,
+      };
+      setStock(prev => [...prev, newStockItem]);
+    }
+    
+    return newUtensil.id;
+  };
+
+  // Update an existing medication
+  const updateMedication = (medication: Medication): void => {
+    setMedications(prev => 
+      prev.map(med => 
+        med.id === medication.id 
+          ? { ...medication, updatedAt: new Date().toISOString() } 
+          : med
+      )
+    );
+  };
+
+  // Update an existing utensil
+  const updateUtensil = (utensil: Utensil): void => {
+    setUtensils(prev => 
+      prev.map(ut => 
+        ut.id === utensil.id 
+          ? { ...utensil, updatedAt: new Date().toISOString() } 
+          : ut
+      )
+    );
+  };
+
+  // Get stock for a specific location
+  const getLocationStock = (locationId: string): Array<{item: Medication | Utensil, itemType: 'medication' | 'utensil', quantity: number}> => {
+    const locationStock = stock.filter(item => item.locationId === locationId);
+    
+    return locationStock.map(stockItem => {
+      let item: Medication | Utensil | undefined;
+      if (stockItem.itemType === 'medication') {
+        item = medications.find(med => med.id === stockItem.itemId);
+      } else {
+        item = utensils.find(ut => ut.id === stockItem.itemId);
+      }
+      
+      return {
+        item: item!,
+        itemType: stockItem.itemType,
+        quantity: stockItem.quantity
+      };
+    }).filter(item => item.item !== undefined);
+  };
+
+  // Get total stock for an item across all locations
+  const getTotalStock = (itemId: string, itemType: 'medication' | 'utensil'): number => {
+    const totalStock = stock
+      .filter(item => item.itemId === itemId && item.itemType === itemType)
+      .reduce((total, item) => total + item.quantity, 0);
+    
+    console.log(`📊 Getting total stock for ${itemType} ${itemId}:`, totalStock);
+    return totalStock;
+  };
+
+  // Helper function to update stock levels
+  const updateStock = (itemId: string, itemType: 'medication' | 'utensil', locationId: string, quantityChange: number): void => {
+    console.log('🔄 Updating stock:', { itemId, itemType, locationId, quantityChange });
+    
+  };
+
+  // Add a new stock transaction (receipt, distribution, etc.)
+  const addStockTransaction = (
+    transactionData: Omit<StockTransaction, 'id' | 'requestDate' | 'status' | 'requestedBy'>
+  ): string => {
+    const now = new Date().toISOString();
+    
+    // Use medicationId as itemId for backward compatibility
         message: 'Por favor, preencha todos os campos obrigatórios.',
       });
-      return;
+    const itemId = transactionData.medicationId;
+    const itemType = transactionData.itemType || 'medication';
+    
+    const newTransaction: StockTransaction = {
+      type: transactionData.type,
+      sourceLocationId: transactionData.sourceLocationId,
+      destinationLocationId: transactionData.destinationLocationId,
+      medicationId: itemId,
+      itemType,
+      quantity: transactionData.quantity,
+      reason: transactionData.reason,
+      patientId: transactionData.patientId,
+      patientName: transactionData.patientName,
+      id: uuidv4(),
+      requestDate: now,
+      status: transactionData.type === 'receipt' || transactionData.type === 'damaged' ? 'completed' : 'pending',
+      requestedBy: user?.id || 'unknown',
+    };
+    
+    setTransactions(prev => [...prev, newTransaction]);
+    
+    // Process transactions that should update stock immediately
+    if (newTransaction.status === 'completed') {
+      if (transactionData.type === 'receipt' && transactionData.destinationLocationId) {
+        console.log('📦 Processing receipt transaction');
+        updateStock(
+          itemId,
+          itemType,
+          transactionData.destinationLocationId,
+          transactionData.quantity
+        );
+      } else if (transactionData.type === 'damaged' && transactionData.sourceLocationId) {
+        console.log('💥 Processing damaged transaction');
+        updateStock(
+          itemId,
+          itemType,
+          transactionData.sourceLocationId,
+          -transactionData.quantity
+        );
+      } else if (transactionData.type === 'patient' && transactionData.sourceLocationId) {
+        console.log('👤 Processing patient transaction');
+        updateStock(
+          itemId,
+          itemType,
+          transactionData.sourceLocationId,
+          -transactionData.quantity
+        );
+      }
     }
     
-    // Check if we have enough stock
-    const stockItem = stock.find(
+    return newTransaction.id;
+  };
+
+  // Update the status of a transaction
+  const updateTransactionStatus = (
+    id: string, 
+    status: 'approved' | 'rejected' | 'completed',
+    processedBy: string
+  ): void => {
+    const transaction = transactions.find(t => t.id === id);
+    if (!transaction) return;
+    
+    const now = new Date().toISOString();
+    const itemType = transaction.itemType || 'medication';
+    
+    setTransactions(prev => 
+      prev.map(t => 
+        t.id === id 
+          ? { ...t, status, processedBy, processDate: now } 
+          : t
       item => item.itemId === selectedMedication.id && 
              item.itemType === 'medication' && 
              item.locationId === user.ubsId
@@ -97,318 +441,190 @@ const PatientDistribution = () => {
       availableStock: stockItem?.quantity || 0
     });
     
-    if (!stockItem || stockItem.quantity < patientInfo.quantity) {
-      addNotification({
-        type: 'error',
-        title: 'Estoque Insuficiente',
-        message: `Não há estoque suficiente de ${selectedMedication.name}. Disponível: ${stockItem?.quantity || 0}, Solicitado: ${patientInfo.quantity}`,
-      });
-      return;
+    // Update stock levels based on status
+    if (status === 'approved') {
+      console.log('✅ Processing approved transaction:', transaction.type);
+      
+      if (transaction.sourceLocationId) {
+        console.log('📤 Reducing stock from source location');
+        updateStock(
+          transaction.medicationId,
+          itemType,
+          transaction.sourceLocationId,
+          -transaction.quantity
+        );
+      }
+      
+      if (transaction.destinationLocationId) {
+        console.log('📥 Adding stock to destination location');
+        updateStock(
+          transaction.medicationId,
+          itemType,
+          transaction.destinationLocationId,
+          transaction.quantity
+        );
+      }
     }
-    
-    // Create transaction
-    addStockTransaction({
-      type: 'patient',
-      sourceLocationId: user.ubsId,
-      destinationLocationId: null,
-      medicationId: selectedMedication.id, // Mantém para compatibilidade
-      itemType: 'medication',
-      itemId: selectedMedication.id,
-      quantity: patientInfo.quantity,
-      reason: `Dispensação para paciente: ${patientInfo.name}`,
-      patientId: patientInfo.id,
-      patientName: patientInfo.name,
-    });
-    
-    addNotification({
-      type: 'success',
-      title: 'Medicamento Dispensado',
-      message: `${patientInfo.quantity} unidades de ${selectedMedication.name} foram dispensadas para ${patientInfo.name}.`,
-    });
-    
-    // Reset form and close modal
-    setShowModal(false);
-    setSelectedMedication(null);
-    setPatientInfo({
-      id: '',
-      name: '',
-      quantity: 0,
-      notes: '',
-    });
   };
 
-  const getAvailableQuantity = (medicationId: string) => {
-    if (!user?.ubsId) return 0;
+  // Get transactions for a specific location
+  const getTransactionsByLocation = (locationId: string | null): StockTransaction[] => {
+    if (!locationId) return transactions;
     
-    const stockItem = stock.find(
-      item => item.itemId === medicationId && item.itemType === 'medication' && item.locationId === user.ubsId
+    return transactions.filter(t => 
+      t.sourceLocationId === locationId || t.destinationLocationId === locationId
     );
+  };
+
+  // Report damaged items
+  const reportDamagedItem = (
+    damagedItemData: Omit<DamagedItem, 'id' | 'reportDate'>
+  ): string => {
+    const now = new Date().toISOString();
+    const newDamagedItem: DamagedItem = {
+      ...damagedItemData,
+      id: uuidv4(),
+        message: `Não há estoque suficiente de ${selectedMedication.name}. Disponível: ${stockItem?.quantity || 0}, Solicitado: ${patientInfo.quantity}`,
+    };
     
-    console.log(`📊 Stock for medication ${medicationId} at UBS ${user.ubsId}:`, stockItem?.quantity || 0);
-    return stockItem ? stockItem.quantity : 0;
+    setDamagedItems(prev => [...prev, newDamagedItem]);
+    
+    // Also create a transaction record for the damaged item
+    addStockTransaction({
+      type: 'damaged',
+      sourceLocationId: damagedItemData.locationId,
+      destinationLocationId: null,
+      medicationId: selectedMedication.id, // Mantém para compatibilidade
+      quantity: damagedItemData.quantity,
+      itemId: selectedMedication.id,
+      reason: damagedItemData.reason,
+    });
+    
+    return newDamagedItem.id;
+  };
+
+  // Generate PDF for approved transactions
+  const generatePDF = (transactionIds: string[]): void => {
+    const selectedTransactions = transactions.filter(t => transactionIds.includes(t.id));
+    
+    // Create PDF content
+    let pdfContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Requisição - MedControl</title>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 20px; }
+          .header { text-align: center; margin-bottom: 30px; }
+          .header h1 { color: #0891b2; margin: 0; }
+          .header p { margin: 5px 0; color: #666; }
+          table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+          th { background-color: #f5f5f5; }
+          .signature { margin-top: 50px; }
+          .signature-line { border-bottom: 1px solid #000; width: 300px; margin: 20px 0; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>MedControl - Sistema de Controle</h1>
+          <p>Requisição de Medicamentos e Utensílios</p>
+          <p>Data: ${new Date().toLocaleDateString()} - Hora: ${new Date().toLocaleTimeString()}</p>
+        </div>
+        
+        <table>
+          <thead>
+            <tr>
+              <th>Tipo</th>
+              <th>Item</th>
+              <th>Quantidade</th>
+              <th>Origem</th>
+              <th>Destino</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+    `;
+    
+    selectedTransactions.forEach(transaction => {
+      let itemName = 'Desconhecido';
+      const medication = getMedicationById(transaction.medicationId);
+      if (medication) {
+        itemName = medication ? medication.name : 'Desconhecido';
+      } else {
+        const utensil = getUtensilById(transaction.medicationId);
+        itemName = utensil ? utensil.name : 'Desconhecido';
+      }
+      
+      const sourceName = transaction.sourceLocationId ? getLocationById(transaction.sourceLocationId)?.name : 'N/A';
+      const destinationName = transaction.destinationLocationId ? getLocationById(transaction.destinationLocationId)?.name : 'N/A';
+      
+      pdfContent += `
+        <tr>
+          <td>Medicamento</td>
+          <td>${itemName}</td>
+          <td>${transaction.quantity}</td>
+          <td>${sourceName}</td>
+          <td>${destinationName}</td>
+          <td>${transaction.status === 'completed' ? 'Liberado' : 'Aprovado'}</td>
+        </tr>
+      `;
+    });
+    
+    pdfContent += `
+          </tbody>
+        </table>
+        
+        <div class="signature">
+          <p><strong>Assinatura do Administrador:</strong></p>
+          <div class="signature-line"></div>
+          <p>Nome: _________________________________</p>
+          <p>Data: _________________________________</p>
+        </div>
+      </body>
+      </html>
+    `;
+    
+    // Open PDF in new window
+    const newWindow = window.open('', '_blank');
+    if (newWindow) {
+      newWindow.document.write(pdfContent);
+      newWindow.document.close();
+      newWindow.print();
+    }
   };
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Dispensação para Pacientes</h1>
-          <p className="text-gray-600 mt-1">Selecione um medicamento disponível para dispensar ao paciente</p>
-        </div>
-      </div>
-
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1">
-          <input
-            type="text"
-            placeholder="Buscar por nome, fabricante ou categoria..."
-            value={searchTerm}
-            onChange={e => setSearchTerm(e.target.value)}
-            className="input pl-10"
-          />
-          <Search className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
-        </div>
-        <div className="flex items-center gap-2 text-sm text-gray-600">
-          <Package size={16} />
-          <span>{filteredMedications.length} medicamentos disponíveis</span>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {filteredMedications.map(medication => {
-          const availableQuantity = getAvailableQuantity(medication.id);
-          const daysUntilExpiry = differenceInDays(
-            new Date(medication.expiryDate),
-            new Date()
-          );
-          const isExpiringSoon = daysUntilExpiry >= 0 && daysUntilExpiry <= 30;
-          const isExpired = daysUntilExpiry < 0;
-          
-          return (
-            <div 
-              key={medication.id}
-              className="card cursor-pointer hover:shadow-lg hover:scale-105 transition-all duration-200 border-l-4 border-primary-500"
-              onClick={() => handleSelectMedication(medication)}
-            >
-              <div className="space-y-3">
-                {/* Header com nome e fabricante */}
-                <div>
-                  <h3 className="font-bold text-lg text-gray-900 mb-1">{medication.name}</h3>
-                  <p className="text-gray-600 text-sm font-medium">{medication.manufacturer}</p>
-                </div>
-
-                {/* Badges de categoria e status */}
-                <div className="flex flex-wrap gap-2">
-                  <span className="badge bg-primary-100 text-primary-800 text-xs">
-                    {medication.category}
-                  </span>
-                  {medication.storageType === 'refrigerated' && (
-                    <span className="badge bg-blue-100 text-blue-800 text-xs flex items-center gap-1">
-                      <Thermometer size={12} />
-                      Refrigerado
-                    </span>
-                  )}
-                  {medication.storageType === 'controlled' && (
-                    <span className="badge bg-warning-100 text-warning-800 text-xs flex items-center gap-1">
-                      <Pill size={12} />
-                      Controlado
-                    </span>
-                  )}
-                  {isExpired && (
-                    <span className="badge bg-danger-100 text-danger-800 text-xs">
-                      Vencido
-                    </span>
-                  )}
-                  {isExpiringSoon && !isExpired && (
-                    <span className="badge bg-warning-100 text-warning-800 text-xs">
-                      Vence em {daysUntilExpiry} dias
-                    </span>
-                  )}
-                </div>
-
-                {/* Informações de estoque */}
-                <div className="bg-gray-50 rounded-lg p-3">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-gray-700">Estoque Disponível</span>
-                    <div className={`px-3 py-1 rounded-full text-sm font-bold ${
-                      availableQuantity > medication.minimumStock 
-                        ? 'bg-success-100 text-success-700' 
-                        : availableQuantity > 0 
-                        ? 'bg-warning-100 text-warning-700'
-                        : 'bg-danger-100 text-danger-700'
-                    }`}>
-                      {availableQuantity} unidades
-                    </div>
-                  </div>
-                  {availableQuantity <= medication.minimumStock && availableQuantity > 0 && (
-                    <div className="flex items-center gap-1 text-warning-600 text-xs">
-                      <AlertTriangle size={12} />
-                      <span>Estoque baixo (mín: {medication.minimumStock})</span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Informações do lote e validade */}
-                <div className="space-y-2 text-xs text-gray-600">
-                  <div className="flex items-center gap-2">
-                    <Package size={14} className="text-gray-400" />
-                    <span><strong>Lote:</strong> {medication.batch}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Calendar size={14} className="text-gray-400" />
-                    <span className={isExpired ? 'text-danger-600 font-medium' : isExpiringSoon ? 'text-warning-600 font-medium' : ''}>
-                      <strong>Validade:</strong> {new Date(medication.expiryDate).toLocaleDateString()}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Botão de ação */}
-                <div className="pt-2 border-t border-gray-100">
-                  <div className="flex items-center justify-center gap-2 text-primary-600 font-medium text-sm">
-                    <Users size={16} />
-                    <span>Clique para Dispensar</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          );
-        })}
-        {filteredMedications.length === 0 && (
-          <div className="col-span-full text-center py-12">
-            <div className="bg-gray-50 rounded-lg p-8">
-              <Package className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Nenhum medicamento disponível</h3>
-              <p className="text-gray-500">
-                Não há medicamentos em estoque nesta UBS para dispensação no momento.
-              </p>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Patient Distribution Modal */}
-      {showModal && selectedMedication && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 animate-fade-in">
-          <div className="bg-white rounded-lg shadow-xl max-w-md mx-auto p-6 w-full">
-            <div className="mb-4">
-              <div className="flex items-start gap-3">
-                <div className="p-2 bg-primary-100 rounded-lg">
-                  <Pill className="h-6 w-6 text-primary-600" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold text-gray-900">Dispensar Medicamento</h3>
-                  <p className="text-gray-600 mt-1">
-                    <strong>{selectedMedication.name}</strong> - {selectedMedication.manufacturer}
-                  </p>
-                  <p className="text-sm text-gray-500">
-                    Lote: {selectedMedication.batch} | Categoria: {selectedMedication.category}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Número do SUS ou CPF do Paciente
-                </label>
-                <div className="mt-1 relative">
-                  <input
-                    type="text"
-                    name="id"
-                    value={patientInfo.id}
-                    onChange={handlePatientInfoChange}
-                    className="input pl-10"
-                    placeholder="Digite o número do SUS ou CPF"
-                    required
-                  />
-                  <Badge className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
-                </div>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Nome do Paciente
-                </label>
-                <div className="mt-1 relative">
-                  <input
-                    type="text"
-                    name="name"
-                    value={patientInfo.name}
-                    onChange={handlePatientInfoChange}
-                    className="input pl-10"
-                    placeholder="Nome completo do paciente"
-                    required
-                  />
-                  <User className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
-                </div>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Quantidade a Dispensar
-                </label>
-                <div className="flex gap-3">
-                  <input
-                    type="number"
-                    name="quantity"
-                    value={patientInfo.quantity}
-                    onChange={handlePatientInfoChange}
-                    className="input flex-1"
-                    min="1"
-                    max={getAvailableQuantity(selectedMedication.id)}
-                    placeholder="Qtd"
-                    required
-                  />
-                  <div className="flex items-center px-3 py-2 bg-gray-50 rounded-md border">
-                    <span className="text-sm text-gray-600">
-                      de {getAvailableQuantity(selectedMedication.id)} disponíveis
-                    </span>
-                  </div>
-                </div>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Observações (opcional)
-                </label>
-                <textarea
-                  name="notes"
-                  value={patientInfo.notes}
-                  onChange={handlePatientInfoChange}
-                  className="input mt-1"
-                  rows={3}
-                  placeholder="Observações sobre a dispensação..."
-                />
-              </div>
-              
-              <div className="flex justify-end gap-3 mt-6">
-                <button
-                  onClick={() => setShowModal(false)}
-                  className="btn-secondary"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={handleDistributeToPatient}
-                  className="btn-primary flex items-center gap-2"
-                  disabled={
-                    !patientInfo.id || 
-                    !patientInfo.name || 
-                    patientInfo.quantity <= 0 ||
-                    patientInfo.quantity > getAvailableQuantity(selectedMedication.id)
-                  }
-                >
-                  <Users size={18} />
-                  Dispensar Medicamento
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+    <MedicationContext.Provider
+      value={{
+        medications,
+        utensils,
+        locations,
+        stock,
+        transactions,
+        damagedItems,
+        
+        addMedication,
+        updateMedication,
+        getMedicationById,
+        
+        addUtensil,
+        updateUtensil,
+        getUtensilById,
+        
+        addStockTransaction,
+        updateTransactionStatus,
+        getTransactionsByLocation,
+        
+        getLocationStock,
+        getTotalStock,
+        getLocationById,
+        
+        reportDamagedItem,
+        generatePDF,
+      }}
+    >
+      {children}
+    </MedicationContext.Provider>
   );
 };
-
-export default PatientDistribution;

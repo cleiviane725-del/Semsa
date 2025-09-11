@@ -52,6 +52,7 @@ export interface StockTransaction {
   sourceLocationId: string | null;
   destinationLocationId: string | null;
   medicationId: string;
+  itemId?: string;
   itemType?: 'medication' | 'utensil';
   quantity: number;
   reason: string;
