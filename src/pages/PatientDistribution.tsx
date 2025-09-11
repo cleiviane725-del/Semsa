@@ -357,8 +357,6 @@ export const MedicationProvider = ({ children }: MedicationProviderProps) => {
     const now = new Date().toISOString();
     
     // Use medicationId as itemId for backward compatibility
-        message: 'Por favor, preencha todos os campos obrigatórios.',
-      });
     const itemId = transactionData.medicationId;
     const itemType = transactionData.itemType || 'medication';
     
