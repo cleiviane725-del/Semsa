@@ -202,7 +202,7 @@ export const seedInitialData = () => {
       itemId: 'med1',
       itemType: 'medication',
       locationId: 'ubs1',
-      quantity: 1000,
+      quantity: 500,
       updatedAt: subDays(new Date(), 20).toISOString(),
     },
     {
@@ -210,7 +210,7 @@ export const seedInitialData = () => {
       itemId: 'med1',
       itemType: 'medication',
       locationId: 'ubs2',
-      quantity: 800,
+      quantity: 300,
       updatedAt: subDays(new Date(), 15).toISOString(),
     },
     {
@@ -218,7 +218,7 @@ export const seedInitialData = () => {
       itemId: 'med2',
       itemType: 'medication',
       locationId: 'warehouse1',
-      quantity: 2000,
+      quantity: 1500,
       updatedAt: subDays(new Date(), 40).toISOString(),
     },
     {
@@ -226,7 +226,7 @@ export const seedInitialData = () => {
       itemId: 'med2',
       itemType: 'medication',
       locationId: 'ubs1',
-      quantity: 500,
+      quantity: 300,
       updatedAt: subDays(new Date(), 18).toISOString(),
     },
     {
@@ -234,7 +234,7 @@ export const seedInitialData = () => {
       itemId: 'med2',
       itemType: 'medication',
       locationId: 'ubs3',
-      quantity: 500,
+      quantity: 200,
       updatedAt: subDays(new Date(), 10).toISOString(),
     },
     {
@@ -242,7 +242,7 @@ export const seedInitialData = () => {
       itemId: 'med3',
       itemType: 'medication',
       locationId: 'warehouse1',
-      quantity: 500,
+      quantity: 300,
       updatedAt: subDays(new Date(), 55).toISOString(),
     },
     {
@@ -250,7 +250,7 @@ export const seedInitialData = () => {
       itemId: 'med3',
       itemType: 'medication',
       locationId: 'ubs1',
-      quantity: 200,
+      quantity: 150,
       updatedAt: subDays(new Date(), 25).toISOString(),
     },
     {
@@ -258,7 +258,7 @@ export const seedInitialData = () => {
       itemId: 'med3',
       itemType: 'medication',
       locationId: 'ubs2',
-      quantity: 200,
+      quantity: 100,
       updatedAt: subDays(new Date(), 22).toISOString(),
     },
     {
@@ -266,7 +266,7 @@ export const seedInitialData = () => {
       itemId: 'med3',
       itemType: 'medication',
       locationId: 'ubs3',
-      quantity: 100,
+      quantity: 50,
       updatedAt: subDays(new Date(), 8).toISOString(),
     },
     {
@@ -274,7 +274,7 @@ export const seedInitialData = () => {
       itemId: 'med4',
       itemType: 'medication',
       locationId: 'warehouse1',
-      quantity: 1000,
+      quantity: 800,
       updatedAt: subDays(new Date(), 85).toISOString(),
     },
     {
@@ -282,7 +282,7 @@ export const seedInitialData = () => {
       itemId: 'med4',
       itemType: 'medication',
       locationId: 'ubs1',
-      quantity: 400,
+      quantity: 300,
       updatedAt: subDays(new Date(), 60).toISOString(),
     },
     {
@@ -290,7 +290,7 @@ export const seedInitialData = () => {
       itemId: 'med4',
       itemType: 'medication',
       locationId: 'ubs2',
-      quantity: 300,
+      quantity: 200,
       updatedAt: subDays(new Date(), 45).toISOString(),
     },
     {
@@ -298,7 +298,7 @@ export const seedInitialData = () => {
       itemId: 'med4',
       itemType: 'medication',
       locationId: 'ubs3',
-      quantity: 300,
+      quantity: 200,
       updatedAt: subDays(new Date(), 30).toISOString(),
     },
     {
@@ -306,7 +306,7 @@ export const seedInitialData = () => {
       itemId: 'med5',
       itemType: 'medication',
       locationId: 'warehouse1',
-      quantity: 300,
+      quantity: 200,
       updatedAt: subDays(new Date(), 14).toISOString(),
     },
     {
@@ -314,7 +314,7 @@ export const seedInitialData = () => {
       itemId: 'med5',
       itemType: 'medication',
       locationId: 'ubs1',
-      quantity: 100,
+      quantity: 80,
       updatedAt: subDays(new Date(), 10).toISOString(),
     },
     {
@@ -330,7 +330,7 @@ export const seedInitialData = () => {
       itemId: 'med5',
       itemType: 'medication',
       locationId: 'ubs3',
-      quantity: 50,
+      quantity: 30,
       updatedAt: subDays(new Date(), 5).toISOString(),
     },
     {
@@ -338,7 +338,7 @@ export const seedInitialData = () => {
       itemId: 'med6',
       itemType: 'medication',
       locationId: 'warehouse1',
-      quantity: 80,
+      quantity: 60,
       updatedAt: subDays(new Date(), 49).toISOString(),
     },
     {
@@ -348,6 +348,22 @@ export const seedInitialData = () => {
       locationId: 'ubs1',
       quantity: 20,
       updatedAt: subDays(new Date(), 30).toISOString(),
+    },
+    {
+      id: uuidv4(),
+      itemId: 'med6',
+      itemType: 'medication',
+      locationId: 'ubs2',
+      quantity: 10,
+      updatedAt: subDays(new Date(), 25).toISOString(),
+    },
+    {
+      id: uuidv4(),
+      itemId: 'med6',
+      itemType: 'medication',
+      locationId: 'ubs3',
+      quantity: 10,
+      updatedAt: subDays(new Date(), 20).toISOString(),
     },
     // Utensils stock
     {

@@ -27,10 +27,13 @@ const PatientDistribution = () => {
     // Get all medications available at this UBS
     const availableMedications = medications.filter(med => {
       const stockItem = stock.find(
-        item => item.medicationId === med.id && item.locationId === user.ubsId
+        item => item.itemId === med.id && item.itemType === 'medication' && item.locationId === user.ubsId
       );
+      console.log(`🔍 Checking medication ${med.name} at UBS ${user.ubsId}:`, stockItem);
       return stockItem && stockItem.quantity > 0;
     });
+    
+    console.log(`📋 Available medications for UBS ${user.ubsId}:`, availableMedications.length);
     
     // Apply search filter
     if (searchTerm) {
@@ -119,6 +122,7 @@ const PatientDistribution = () => {
       item => item.itemId === medicationId && item.itemType === 'medication' && item.locationId === user.ubsId
     );
     
+    console.log(`📊 Stock for medication ${medicationId} at UBS ${user.ubsId}:`, stockItem?.quantity || 0);
     return stockItem ? stockItem.quantity : 0;
   };
 
