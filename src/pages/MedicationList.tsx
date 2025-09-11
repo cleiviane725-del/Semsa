@@ -27,6 +27,12 @@ const MedicationList = () => {
   useEffect(() => {
     let result = [...medications];
 
+    // Force re-calculation of stock for each medication
+    result = result.map(med => ({
+      ...med,
+      _stockCalculated: getTotalStock(med.id, 'medication')
+    }));
+
     // Apply search filter
     if (searchTerm) {
       result = result.filter(
@@ -209,7 +215,7 @@ const MedicationList = () => {
                       <span
                         className={isLowStock ? 'text-danger-600 font-medium' : ''}
                       >
-                        {totalStock}
+                        {totalStock || 0}
                         {isLowStock && (
                           <span className="ml-2 text-xs bg-danger-100 text-danger-800 px-1.5 py-0.5 rounded">
                             Baixo

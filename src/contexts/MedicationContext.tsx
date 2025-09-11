@@ -336,49 +336,18 @@ export const MedicationProvider = ({ children }: MedicationProviderProps) => {
 
   // Get total stock for an item across all locations
   const getTotalStock = (itemId: string, itemType: 'medication' | 'utensil'): number => {
-    return stock
+    const totalStock = stock
       .filter(item => item.itemId === itemId && item.itemType === itemType)
       .reduce((total, item) => total + item.quantity, 0);
+    
+    console.log(`📊 Getting total stock for ${itemType} ${itemId}:`, totalStock);
+    return totalStock;
   };
 
   // Helper function to update stock levels
   const updateStock = (itemId: string, itemType: 'medication' | 'utensil', locationId: string, quantityChange: number): void => {
     console.log('🔄 Updating stock:', { itemId, itemType, locationId, quantityChange });
     
-    const existingStockItem = stock.find(
-      item => item.itemId === itemId && item.itemType === itemType && item.locationId === locationId
-    );
-    
-    if (existingStockItem) {
-      // Update existing stock
-      console.log('✅ Updating existing stock item from', existingStockItem.quantity, 'to', existingStockItem.quantity + quantityChange);
-      setStock(prev => 
-        prev.map(item => 
-          item.id === existingStockItem.id
-            ? { 
-                ...item, 
-                quantity: Math.max(0, item.quantity + quantityChange),
-                updatedAt: new Date().toISOString() 
-              }
-            : item
-        )
-      );
-    } else if (quantityChange > 0) {
-      // Create new stock entry if it's an addition
-      console.log('➕ Creating new stock item with quantity:', quantityChange);
-      const newStockItem: StockItem = {
-        id: uuidv4(),
-        itemId,
-        itemType,
-        locationId,
-        quantity: quantityChange,
-        updatedAt: new Date().toISOString(),
-      };
-      
-      setStock(prev => [...prev, newStockItem]);
-    } else {
-      console.log('❌ Cannot reduce stock - no existing stock item found');
-    }
   };
 
   // Add a new stock transaction (receipt, distribution, etc.)

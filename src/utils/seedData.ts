@@ -3,10 +3,15 @@ import { v4 as uuidv4 } from 'uuid';
 import { Medication, Utensil, StockLocation, StockItem, StockTransaction, DamagedItem } from '../contexts/MedicationContext';
 
 export const seedInitialData = () => {
-  // Only seed if data doesn't exist
-  if (localStorage.getItem('med_locations')) {
-    return;
-  }
+  // Clear existing data to ensure fresh start
+  localStorage.removeItem('med_locations');
+  localStorage.removeItem('med_medications');
+  localStorage.removeItem('med_utensils');
+  localStorage.removeItem('med_stock');
+  localStorage.removeItem('med_transactions');
+  localStorage.removeItem('med_damagedItems');
+  
+  console.log('🧹 Cleared all existing data, seeding fresh data...');
 
   // Demo locations
   const locations: StockLocation[] = [
