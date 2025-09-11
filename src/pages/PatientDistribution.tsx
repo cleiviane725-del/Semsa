@@ -75,19 +75,33 @@ const PatientDistribution = () => {
       !patientInfo.name || 
       patientInfo.quantity <= 0
     ) {
+      addNotification({
+        type: 'error',
+        title: 'Dados Incompletos',
+        message: 'Por favor, preencha todos os campos obrigatórios.',
+      });
       return;
     }
     
     // Check if we have enough stock
     const stockItem = stock.find(
-      item => item.medicationId === selectedMedication.id && item.locationId === user.ubsId
+      item => item.itemId === selectedMedication.id && 
+             item.itemType === 'medication' && 
+             item.locationId === user.ubsId
     );
+    
+    console.log('🔍 Checking stock for dispensing:', {
+      medicationId: selectedMedication.id,
+      ubsId: user.ubsId,
+      requestedQuantity: patientInfo.quantity,
+      availableStock: stockItem?.quantity || 0
+    });
     
     if (!stockItem || stockItem.quantity < patientInfo.quantity) {
       addNotification({
         type: 'error',
         title: 'Estoque Insuficiente',
-        message: `Não há estoque suficiente de ${selectedMedication.name} para realizar esta dispensação.`,
+        message: `Não há estoque suficiente de ${selectedMedication.name}. Disponível: ${stockItem?.quantity || 0}, Solicitado: ${patientInfo.quantity}`,
       });
       return;
     }
@@ -97,13 +111,13 @@ const PatientDistribution = () => {
       type: 'patient',
       sourceLocationId: user.ubsId,
       destinationLocationId: null,
-      medicationId: selectedMedication.id,
+      medicationId: selectedMedication.id, // Mantém para compatibilidade
       itemType: 'medication',
+      itemId: selectedMedication.id,
       quantity: patientInfo.quantity,
       reason: `Dispensação para paciente: ${patientInfo.name}`,
       patientId: patientInfo.id,
       patientName: patientInfo.name,
-      status: 'completed',
     });
     
     addNotification({
@@ -112,7 +126,15 @@ const PatientDistribution = () => {
       message: `${patientInfo.quantity} unidades de ${selectedMedication.name} foram dispensadas para ${patientInfo.name}.`,
     });
     
+    // Reset form and close modal
     setShowModal(false);
+    setSelectedMedication(null);
+    setPatientInfo({
+      id: '',
+      name: '',
+      quantity: 0,
+      notes: '',
+    });
   };
 
   const getAvailableQuantity = (medicationId: string) => {
