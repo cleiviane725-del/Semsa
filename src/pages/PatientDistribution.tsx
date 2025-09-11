@@ -115,7 +115,7 @@ const PatientDistribution = () => {
     if (!user?.ubsId) return 0;
     
     const stockItem = stock.find(
-      item => item.medicationId === medicationId && item.locationId === user.ubsId
+      item => item.itemId === medicationId && item.itemType === 'medication' && item.locationId === user.ubsId
     );
     
     return stockItem ? stockItem.quantity : 0;
