@@ -350,12 +350,14 @@ export const MedicationProvider = ({ children }: MedicationProviderProps) => {
     console.log('🔄 Updating stock:', { itemId, itemType, locationId, quantityChange });
     
     setStock(prevStock => {
+      let stockUpdated = false;
       const updatedStock = prevStock.map(stockItem => {
         if (stockItem.itemId === itemId && 
             stockItem.itemType === itemType && 
             stockItem.locationId === locationId) {
           const newQuantity = Math.max(0, stockItem.quantity + quantityChange);
           console.log(`📊 Stock updated: ${stockItem.quantity} → ${newQuantity}`);
+          stockUpdated = true;
           return {
             ...stockItem,
             quantity: newQuantity,
@@ -364,6 +366,11 @@ export const MedicationProvider = ({ children }: MedicationProviderProps) => {
         }
         return stockItem;
       });
+      
+      if (!stockUpdated) {
+        console.log('⚠️ No stock item found to update for:', { itemId, itemType, locationId });
+        console.log('📦 Available stock items:', prevStock);
+      }
       
       console.log('📦 Updated stock array:', updatedStock);
       return updatedStock;
@@ -418,6 +425,12 @@ export const MedicationProvider = ({ children }: MedicationProviderProps) => {
         );
       } else if (transactionData.type === 'patient' && transactionData.sourceLocationId) {
         console.log('👤 Processing patient transaction');
+        console.log('👤 Patient transaction details:', {
+          itemId,
+          itemType,
+          sourceLocationId: transactionData.sourceLocationId,
+          quantity: transactionData.quantity
+        });
         updateStock(
           itemId,
           itemType,

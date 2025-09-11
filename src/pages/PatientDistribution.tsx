@@ -14,7 +14,8 @@ const PatientDistribution: React.FC = () => {
   const { user } = useAuth();
   const { 
     medications, 
-    getLocationStock, 
+    getLocationStock,
+    stock,
     addStockTransaction, 
     getTotalStock 
   } = useMedication();
@@ -34,21 +35,35 @@ const PatientDistribution: React.FC = () => {
   const availableMedications = React.useMemo(() => {
     if (!user?.ubsId) return [];
     
-    const locationStock = getLocationStock(user.ubsId);
-    console.log('🏥 Location stock for UBS:', user.ubsId, locationStock);
+    console.log('🏥 All stock:', stock);
+    console.log('🏥 User UBS ID:', user.ubsId);
     
-    return locationStock
-      .filter(item => item.itemType === 'medication' && item.quantity > 0)
-      .map(item => ({
-        ...item.item,
-        availableQuantity: item.quantity
+    // Get stock items for this UBS
+    const ubsStock = stock.filter(item => 
+      item.locationId === user.ubsId && 
+      item.itemType === 'medication' && 
+      item.quantity > 0
+    );
+    
+    console.log('🏥 UBS stock items:', ubsStock);
+    
+    return ubsStock
+      .map(stockItem => {
+        const medication = medications.find(med => med.id === stockItem.itemId);
+        if (!medication) return null;
+        
+        return {
+          ...medication,
+          availableQuantity: stockItem.quantity
+        };
       }))
+      .filter(med => med !== null)
       .filter(med => 
         med.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         med.manufacturer.toLowerCase().includes(searchTerm.toLowerCase()) ||
         med.category.toLowerCase().includes(searchTerm.toLowerCase())
       );
-  }, [user?.ubsId, getLocationStock, searchTerm]);
+  }, [user?.ubsId, stock, medications, searchTerm]);
 
   const handleDispenseMedication = () => {
     if (!selectedMedication || !user?.ubsId) return;
