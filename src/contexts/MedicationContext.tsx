@@ -388,7 +388,7 @@ export const MedicationProvider = ({ children }: MedicationProviderProps) => {
     const now = new Date().toISOString();
     
     // Use medicationId as itemId for backward compatibility
-    const itemId = transactionData.medicationId;
+    const itemId = transactionData.itemId || transactionData.medicationId;
     const itemType = transactionData.itemType || 'medication';
     
     const newTransaction: StockTransaction = {
@@ -396,6 +396,7 @@ export const MedicationProvider = ({ children }: MedicationProviderProps) => {
       sourceLocationId: transactionData.sourceLocationId,
       destinationLocationId: transactionData.destinationLocationId,
       medicationId: itemId,
+      itemId: itemId,
       itemType,
       quantity: transactionData.quantity,
       reason: transactionData.reason,
@@ -403,7 +404,7 @@ export const MedicationProvider = ({ children }: MedicationProviderProps) => {
       patientName: transactionData.patientName,
       id: uuidv4(),
       requestDate: now,
-      status: transactionData.type === 'receipt' || transactionData.type === 'damaged' ? 'completed' : 'pending',
+      status: transactionData.type === 'receipt' || transactionData.type === 'damaged' || transactionData.type === 'patient' ? 'completed' : 'pending',
       requestedBy: user?.id || 'unknown',
     };
     
@@ -429,22 +430,12 @@ export const MedicationProvider = ({ children }: MedicationProviderProps) => {
         );
       } else if (transactionData.type === 'patient' && transactionData.sourceLocationId) {
         console.log('👤 Processing patient transaction');
-        console.log('👤 Patient transaction details:', {
+        updateStock(
           itemId,
           itemType,
-          sourceLocationId: transactionData.sourceLocationId,
-          quantity: transactionData.quantity
-        });
-        
-        // Force immediate stock update for patient transactions
-        setTimeout(() => {
-          updateStock(
-            itemId,
-            itemType,
-            transactionData.sourceLocationId,
-            -transactionData.quantity
-          );
-        }, 100);
+          transactionData.sourceLocationId,
+          -transactionData.quantity
+        );
       }
     }
     

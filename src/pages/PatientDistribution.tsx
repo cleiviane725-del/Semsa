@@ -99,7 +99,7 @@ const PatientDistribution: React.FC = () => {
       type: 'patient',
       sourceLocationId: user.ubsId,
       destinationLocationId: null,
-      medicationId: selectedMedication.id,
+      itemId: selectedMedication.id,
       itemType: 'medication',
       quantity: patientInfo.quantity,
       reason: `Dispensação para paciente: ${patientInfo.name}`,

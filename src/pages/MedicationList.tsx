@@ -7,7 +7,7 @@ import { differenceInDays } from 'date-fns';
 
 const MedicationList = () => {
   const { medications, stock, getTotalStock } = useMedication();
-  const { userRole } = useAuth();
+  const { userRole, user } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [filter, setFilter] = useState<string>('all');
   const [showModal, setShowModal] = useState(false);
@@ -27,11 +27,40 @@ const MedicationList = () => {
   useEffect(() => {
     let result = [...medications];
 
-    // Force re-calculation of stock for each medication
-    result = result.map(med => ({
-      ...med,
-      _stockCalculated: getTotalStock(med.id, 'medication')
-    }));
+    // If pharmacist, only show medications available in their UBS
+    if (user?.role === 'pharmacist' && user.ubsId) {
+      result = result.filter(med => {
+        const ubsStock = stock.find(
+          item => item.itemId === med.id && 
+                  item.itemType === 'medication' && 
+                  item.locationId === user.ubsId &&
+                  item.quantity > 0
+        );
+        return ubsStock !== undefined;
+      });
+    }
+
+    // Add stock calculation for display
+    result = result.map(med => {
+      let stockQuantity;
+      if (user?.role === 'pharmacist' && user.ubsId) {
+        // For pharmacists, show only UBS stock
+        const ubsStock = stock.find(
+          item => item.itemId === med.id && 
+                  item.itemType === 'medication' && 
+                  item.locationId === user.ubsId
+        );
+        stockQuantity = ubsStock ? ubsStock.quantity : 0;
+      } else {
+        // For admin/warehouse, show total stock
+        stockQuantity = getTotalStock(med.id, 'medication');
+      }
+      
+      return {
+        ...med,
+        _stockCalculated: stockQuantity
+      };
+    });
 
     // Apply search filter
     if (searchTerm) {
@@ -48,7 +77,7 @@ const MedicationList = () => {
     if (filter !== 'all') {
       if (filter === 'low-stock') {
         result = result.filter(med => {
-          const totalStock = getTotalStock(med.id);
+          const totalStock = med._stockCalculated || 0;
           return totalStock <= med.minimumStock;
         });
       } else if (filter === 'expiring-soon') {
@@ -69,7 +98,7 @@ const MedicationList = () => {
     }
 
     setFilteredMedications(result);
-  }, [medications, searchTerm, filter, getTotalStock]);
+  }, [medications, searchTerm, filter, getTotalStock, stock, user]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -174,7 +203,7 @@ const MedicationList = () => {
             </thead>
             <tbody>
               {filteredMedications.map(medication => {
-                const totalStock = getTotalStock(medication.id, 'medication');
+                const totalStock = medication._stockCalculated || 0;
                 const isLowStock = totalStock <= medication.minimumStock;
                 const daysUntilExpiry = differenceInDays(
                   new Date(medication.expiryDate),
