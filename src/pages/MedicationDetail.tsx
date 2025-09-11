@@ -152,6 +152,7 @@ const MedicationDetail = () => {
       sourceLocationId: damageReport.locationId,
       destinationLocationId: null,
       medicationId: medication.id,
+      itemType: 'medication',
       quantity: damageReport.quantity,
       reason: damageReport.reason,
       status: 'completed',
@@ -179,6 +180,7 @@ const MedicationDetail = () => {
       sourceLocationId: null,
       destinationLocationId: 'warehouse1',
       medicationId: medication.id,
+      itemType: 'medication',
       quantity: receiveStock.quantity,
       reason: receiveStock.reason,
       status: 'completed',
@@ -204,21 +206,42 @@ const MedicationDetail = () => {
       !distributeStock.destinationId
     ) return;
     
-    // Para farmacêuticos, criar solicitação para o administrador
-    addStockTransaction({
-      type: 'distribution',
-      sourceLocationId: 'warehouse1', // Sempre do almoxarifado
-      destinationLocationId: user?.ubsId || '',
-      medicationId: medication.id,
-      quantity: distributeStock.quantity,
-      reason: distributeStock.reason,
-    });
-    
-    addNotification({
-      type: 'success',
-      title: 'Solicitação Enviada',
-      message: `Solicitação de ${distributeStock.quantity} unidades de ${medication.name} foi enviada com sucesso ao Administrador.`,
-    });
+    if (user?.role === 'admin') {
+      // Admin pode distribuir diretamente
+      addStockTransaction({
+        type: 'distribution',
+        sourceLocationId: 'warehouse1',
+        destinationLocationId: distributeStock.destinationId,
+        medicationId: medication.id,
+        itemType: 'medication',
+        quantity: distributeStock.quantity,
+        reason: distributeStock.reason,
+        status: 'completed',
+      });
+      
+      addNotification({
+        type: 'success',
+        title: 'Medicamento Distribuído',
+        message: `${distributeStock.quantity} unidades de ${medication.name} foram distribuídas com sucesso.`,
+      });
+    } else {
+      // Farmacêuticos criam solicitação
+      addStockTransaction({
+        type: 'distribution',
+        sourceLocationId: 'warehouse1',
+        destinationLocationId: user?.ubsId || '',
+        medicationId: medication.id,
+        itemType: 'medication',
+        quantity: distributeStock.quantity,
+        reason: distributeStock.reason,
+      });
+      
+      addNotification({
+        type: 'success',
+        title: 'Solicitação Enviada',
+        message: `Solicitação de ${distributeStock.quantity} unidades de ${medication.name} foi enviada com sucesso ao Administrador.`,
+      });
+    }
     
     setShowDistributeModal(false);
     setDistributeStock({

@@ -95,6 +95,7 @@ const PatientDistribution = () => {
       sourceLocationId: user.ubsId,
       destinationLocationId: null,
       medicationId: selectedMedication.id,
+      itemType: 'medication',
       quantity: patientInfo.quantity,
       reason: `Dispensação para paciente: ${patientInfo.name}`,
       patientId: patientInfo.id,

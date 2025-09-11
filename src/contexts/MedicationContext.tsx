@@ -249,6 +249,7 @@ export const MedicationProvider = ({ children }: MedicationProviderProps) => {
     
     // Add initial stock to warehouse
     if (medicationData.quantity > 0) {
+      console.log('🏥 Adding initial stock for new medication:', newMedication.name, 'quantity:', medicationData.quantity);
       const newStockItem: StockItem = {
         id: uuidv4(),
         itemId: newMedication.id,
@@ -342,7 +343,7 @@ export const MedicationProvider = ({ children }: MedicationProviderProps) => {
 
   // Helper function to update stock levels
   const updateStock = (itemId: string, itemType: 'medication' | 'utensil', locationId: string, quantityChange: number): void => {
-    console.log('Updating stock:', { itemId, itemType, locationId, quantityChange });
+    console.log('🔄 Updating stock:', { itemId, itemType, locationId, quantityChange });
     
     const existingStockItem = stock.find(
       item => item.itemId === itemId && item.itemType === itemType && item.locationId === locationId
@@ -350,7 +351,7 @@ export const MedicationProvider = ({ children }: MedicationProviderProps) => {
     
     if (existingStockItem) {
       // Update existing stock
-      console.log('Updating existing stock item:', existingStockItem);
+      console.log('✅ Updating existing stock item from', existingStockItem.quantity, 'to', existingStockItem.quantity + quantityChange);
       setStock(prev => 
         prev.map(item => 
           item.id === existingStockItem.id
@@ -364,7 +365,7 @@ export const MedicationProvider = ({ children }: MedicationProviderProps) => {
       );
     } else if (quantityChange > 0) {
       // Create new stock entry if it's an addition
-      console.log('Creating new stock item');
+      console.log('➕ Creating new stock item with quantity:', quantityChange);
       const newStockItem: StockItem = {
         id: uuidv4(),
         itemId,
@@ -375,6 +376,8 @@ export const MedicationProvider = ({ children }: MedicationProviderProps) => {
       };
       
       setStock(prev => [...prev, newStockItem]);
+    } else {
+      console.log('❌ Cannot reduce stock - no existing stock item found');
     }
   };
 
@@ -406,10 +409,10 @@ export const MedicationProvider = ({ children }: MedicationProviderProps) => {
     
     setTransactions(prev => [...prev, newTransaction]);
     
-    // Process certain transactions immediately
-    if ((transactionData.type === 'receipt' || transactionData.type === 'damaged') && newTransaction.status === 'completed') {
+    // Process transactions that should update stock immediately
+    if (newTransaction.status === 'completed') {
       if (transactionData.type === 'receipt' && transactionData.destinationLocationId) {
-        console.log('Processing receipt transaction', { itemId, itemType, locationId: transactionData.destinationLocationId, quantity: transactionData.quantity });
+        console.log('📦 Processing receipt transaction');
         updateStock(
           itemId,
           itemType,
@@ -417,7 +420,15 @@ export const MedicationProvider = ({ children }: MedicationProviderProps) => {
           transactionData.quantity
         );
       } else if (transactionData.type === 'damaged' && transactionData.sourceLocationId) {
-        console.log('Processing damaged transaction', { itemId, itemType, locationId: transactionData.sourceLocationId, quantity: -transactionData.quantity });
+        console.log('💥 Processing damaged transaction');
+        updateStock(
+          itemId,
+          itemType,
+          transactionData.sourceLocationId,
+          -transactionData.quantity
+        );
+      } else if (transactionData.type === 'patient' && transactionData.sourceLocationId) {
+        console.log('👤 Processing patient transaction');
         updateStock(
           itemId,
           itemType,
@@ -425,19 +436,6 @@ export const MedicationProvider = ({ children }: MedicationProviderProps) => {
           -transactionData.quantity
         );
       }
-        console.log('Processing patient transaction');
-    }
-    
-    // Process patient distributions immediately
-    if (transactionData.type === 'patient' && transactionData.sourceLocationId) {
-      newTransaction.status = 'completed';
-      console.log('Processing patient transaction', { itemId, itemType, locationId: transactionData.sourceLocationId, quantity: -transactionData.quantity });
-      updateStock(
-        itemId,
-        transactionData.itemType || 'medication',
-        transactionData.sourceLocationId,
-        -transactionData.quantity
-      );
     }
     
     return newTransaction.id;
@@ -464,11 +462,11 @@ export const MedicationProvider = ({ children }: MedicationProviderProps) => {
     );
     
     // Update stock levels based on status
-    if (status === 'approved' || status === 'completed') {
-      console.log('Processing transaction status update:', { status, transaction });
+    if (status === 'approved') {
+      console.log('✅ Processing approved transaction:', transaction.type);
       
       if (transaction.sourceLocationId) {
-        console.log('Reducing stock from source');
+        console.log('📤 Reducing stock from source location');
         updateStock(
           transaction.medicationId,
           itemType,
@@ -478,7 +476,7 @@ export const MedicationProvider = ({ children }: MedicationProviderProps) => {
       }
       
       if (transaction.destinationLocationId) {
-        console.log('Adding stock to destination');
+        console.log('📥 Adding stock to destination location');
         updateStock(
           transaction.medicationId,
           itemType,
