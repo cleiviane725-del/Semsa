@@ -52,6 +52,7 @@ export interface StockTransaction {
   sourceLocationId: string | null;
   destinationLocationId: string | null;
   medicationId: string;
+  itemType?: 'medication' | 'utensil';
   quantity: number;
   reason: string;
   patientId?: string;
@@ -371,6 +372,9 @@ export const MedicationProvider = ({ children }: MedicationProviderProps) => {
       
       setStock(prev => [...prev, newStockItem]);
     }
+    
+    // Force re-render by updating the stock state
+    setStock(prev => [...prev]);
   };
 
   // Add a new stock transaction (receipt, distribution, etc.)
@@ -421,30 +425,15 @@ export const MedicationProvider = ({ children }: MedicationProviderProps) => {
       }
     }
     
-    // If admin is making a distribution, complete it immediately
-    if (transactionData.type === 'distribution' && user?.role === 'admin') {
+    // Process patient distributions immediately
+    if (transactionData.type === 'patient' && transactionData.sourceLocationId) {
       newTransaction.status = 'completed';
-      newTransaction.processedBy = user.id;
-      newTransaction.processDate = now;
-      
-      // Update stock immediately for admin distributions
-      if (transactionData.sourceLocationId) {
-        updateStock(
-          medicationId,
-          transactionData.itemType || 'medication',
-          transactionData.sourceLocationId,
-          -transactionData.quantity
-        );
-      }
-      
-      if (transactionData.destinationLocationId) {
-        updateStock(
-          medicationId,
-          transactionData.itemType || 'medication',
-          transactionData.destinationLocationId,
-          transactionData.quantity
-        );
-      }
+      updateStock(
+        medicationId,
+        transactionData.itemType || 'medication',
+        transactionData.sourceLocationId,
+        -transactionData.quantity
+      );
     }
     
     return newTransaction.id;
@@ -470,11 +459,11 @@ export const MedicationProvider = ({ children }: MedicationProviderProps) => {
     );
     
     // Update stock levels based on status
-    if (status === 'completed' || (status === 'approved' && user?.role === 'admin')) {
+    if (status === 'approved' || status === 'completed') {
       if (transaction.sourceLocationId) {
         updateStock(
           transaction.medicationId,
-          'medication',
+          transaction.itemType || 'medication',
           transaction.sourceLocationId,
           -transaction.quantity
         );
@@ -483,7 +472,7 @@ export const MedicationProvider = ({ children }: MedicationProviderProps) => {
       if (transaction.destinationLocationId) {
         updateStock(
           transaction.medicationId,
-          'medication',
+          transaction.itemType || 'medication',
           transaction.destinationLocationId,
           transaction.quantity
         );
@@ -518,8 +507,7 @@ export const MedicationProvider = ({ children }: MedicationProviderProps) => {
       type: 'damaged',
       sourceLocationId: damagedItemData.locationId,
       destinationLocationId: null,
-      itemId: damagedItemData.itemId,
-      itemType: damagedItemData.itemType,
+      medicationId: damagedItemData.itemId,
       quantity: damagedItemData.quantity,
       reason: damagedItemData.reason,
     });
@@ -572,11 +560,11 @@ export const MedicationProvider = ({ children }: MedicationProviderProps) => {
     
     selectedTransactions.forEach(transaction => {
       let itemName = 'Desconhecido';
-      if (transaction.itemType === 'medication') {
-        const medication = getMedicationById(transaction.itemId);
+      const medication = getMedicationById(transaction.medicationId);
+      if (medication) {
         itemName = medication ? medication.name : 'Desconhecido';
       } else {
-        const utensil = getUtensilById(transaction.itemId);
+        const utensil = getUtensilById(transaction.medicationId);
         itemName = utensil ? utensil.name : 'Desconhecido';
       }
       
@@ -585,7 +573,7 @@ export const MedicationProvider = ({ children }: MedicationProviderProps) => {
       
       pdfContent += `
         <tr>
-          <td>${transaction.itemType === 'medication' ? 'Medicamento' : 'Utensílio'}</td>
+          <td>Medicamento</td>
           <td>${itemName}</td>
           <td>${transaction.quantity}</td>
           <td>${sourceName}</td>
