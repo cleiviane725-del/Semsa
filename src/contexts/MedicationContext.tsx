@@ -342,7 +342,7 @@ export const MedicationProvider = ({ children }: MedicationProviderProps) => {
 
   // Helper function to update stock levels
   const updateStock = (itemId: string, itemType: 'medication' | 'utensil', locationId: string, quantityChange: number): void => {
-    console.log('Updating stock:', { itemId, itemType, locationId, quantityChange });
+    console.log('🔄 Updating stock:', { itemId, itemType, locationId, quantityChange });
     
     const existingStockItem = stock.find(
       item => item.itemId === itemId && item.itemType === itemType && item.locationId === locationId
@@ -350,7 +350,7 @@ export const MedicationProvider = ({ children }: MedicationProviderProps) => {
     
     if (existingStockItem) {
       // Update existing stock
-      console.log('Updating existing stock item:', existingStockItem);
+      console.log('✅ Updating existing stock item:', existingStockItem, 'New quantity:', existingStockItem.quantity + quantityChange);
       setStock(prev => 
         prev.map(item => 
           item.id === existingStockItem.id
@@ -364,7 +364,7 @@ export const MedicationProvider = ({ children }: MedicationProviderProps) => {
       );
     } else if (quantityChange > 0) {
       // Create new stock entry if it's an addition
-      console.log('Creating new stock item');
+      console.log('🆕 Creating new stock item:', { itemId, itemType, locationId, quantity: quantityChange });
       const newStockItem: StockItem = {
         id: uuidv4(),
         itemId,
@@ -375,6 +375,8 @@ export const MedicationProvider = ({ children }: MedicationProviderProps) => {
       };
       
       setStock(prev => [...prev, newStockItem]);
+    } else {
+      console.log('❌ No stock item found and quantityChange is not positive:', { itemId, itemType, locationId, quantityChange });
     }
   };
 
