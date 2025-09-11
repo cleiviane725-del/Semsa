@@ -66,12 +66,12 @@ const MedicationDetail = () => {
   }
 
   const totalStock = stock
-    .filter(item => item.medicationId === medication.id)
+    .filter(item => item.itemId === medication.id && item.itemType === 'medication')
     .reduce((sum, item) => sum + item.quantity, 0);
   
   const stockByLocation = locations.map(location => {
     const stockItem = stock.find(
-      item => item.medicationId === medication.id && item.locationId === location.id
+      item => item.itemId === medication.id && item.itemType === 'medication' && item.locationId === location.id
     );
     return {
       locationId: location.id,
@@ -81,7 +81,7 @@ const MedicationDetail = () => {
   });
   
   const relevantTransactions = transactions
-    .filter(t => t.medicationId === medication.id)
+    .filter(t => t.medicationId === medication.id || t.itemId === medication.id)
     .sort((a, b) => new Date(b.requestDate).getTime() - new Date(a.requestDate).getTime())
     .slice(0, 10);
   
