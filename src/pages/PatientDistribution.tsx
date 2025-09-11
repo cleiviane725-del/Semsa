@@ -427,6 +427,7 @@ export const MedicationProvider = ({ children }: MedicationProviderProps) => {
         t.id === id 
           ? { ...t, status, processedBy, processDate: now } 
           : t
+      )
       item => item.itemId === selectedMedication.id && 
              item.itemType === 'medication' && 
              item.locationId === user.ubsId
