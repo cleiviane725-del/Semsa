@@ -57,11 +57,17 @@ const Reports = () => {
 
     // Generate stock report data
     const generateStockReport = () => {
-      const report = medications.map(medication => {
+      // Combine medications and utensils
+      const allItems = [
+        ...medications.map(med => ({ ...med, itemType: 'medication' as const })),
+        ...utensils.map(utensil => ({ ...utensil, itemType: 'utensil' as const }))
+      ];
+      
+      const report = allItems.map(item => {
         // Get stock for each location
         const locationStocks = locations.map(location => {
           const stockItem = stock.find(
-            item => item.itemId === medication.id && item.itemType === 'medication' && item.locationId === location.id
+            stockItem => stockItem.itemId === item.id && stockItem.itemType === item.itemType && stockItem.locationId === location.id
           );
           return {
             locationId: location.id,
@@ -74,16 +80,17 @@ const Reports = () => {
         const totalStock = locationStocks.reduce((sum, loc) => sum + loc.quantity, 0);
         
         // Check if any location has low stock
-        const hasLowStock = totalStock <= medication.minimumStock;
+        const hasLowStock = totalStock <= item.minimumStock;
         
         return {
-          id: medication.id,
-          name: medication.name,
-          manufacturer: medication.manufacturer,
-          batch: medication.batch,
-          expiryDate: medication.expiryDate,
-          category: medication.category,
-          minimumStock: medication.minimumStock,
+          id: item.id,
+          name: item.name,
+          manufacturer: item.manufacturer,
+          batch: item.batch,
+          expiryDate: item.expiryDate,
+          category: item.category,
+          minimumStock: item.minimumStock,
+          itemType: item.itemType,
           totalStock,
           hasLowStock,
           locationStocks,
@@ -104,6 +111,12 @@ const Reports = () => {
     
     // Generate movements report data
     const generateMovementReport = () => {
+      // Combine medications and utensils
+      const allItems = [
+        ...medications.map(med => ({ ...med, itemType: 'medication' as const })),
+        ...utensils.map(utensil => ({ ...utensil, itemType: 'utensil' as const }))
+      ];
+      
       // Filter transactions based on date range
       let filteredTransactions = transactions.filter(t => {
         const transactionDate = new Date(t.requestDate);
@@ -118,24 +131,25 @@ const Reports = () => {
       }
       
       // Group by medication and calculate totals
-      const medicationMovements = medications.map(medication => {
-        const medicationTransactions = filteredTransactions.filter(
-          t => (t.itemId || t.medicationId) === medication.id
+      const itemMovements = allItems.map(item => {
+        const itemTransactions = filteredTransactions.filter(
+          t => (t.itemId || t.medicationId) === item.id && 
+               (t.itemType === item.itemType || (!t.itemType && item.itemType === 'medication'))
         );
         
-        const receipts = medicationTransactions
+        const receipts = itemTransactions
           .filter(t => t.type === 'receipt' && t.status === 'completed')
           .reduce((sum, t) => sum + t.quantity, 0);
         
-        const distributions = medicationTransactions
+        const distributions = itemTransactions
           .filter(t => t.type === 'distribution' && t.status === 'completed')
           .reduce((sum, t) => sum + t.quantity, 0);
         
-        const patientDistributions = medicationTransactions
+        const patientDistributions = itemTransactions
           .filter(t => t.type === 'patient' && t.status === 'completed')
           .reduce((sum, t) => sum + t.quantity, 0);
         
-        const damaged = medicationTransactions
+        const damaged = itemTransactions
           .filter(t => t.type === 'damaged' && t.status === 'completed')
           .reduce((sum, t) => sum + t.quantity, 0);
         
@@ -144,8 +158,9 @@ const Reports = () => {
         const balance = totalIn - totalOut;
         
         return {
-          id: medication.id,
-          name: medication.name,
+          id: item.id,
+          name: item.name,
+          itemType: item.itemType,
           receipts,
           distributions,
           patientDistributions,
@@ -158,23 +173,29 @@ const Reports = () => {
       });
       
       // Only return medications with movements
-      return medicationMovements.filter(m => m.hasMovements);
+      return itemMovements.filter(m => m.hasMovements);
     };
     
     // Generate expiry report data
     const generateExpiryReport = () => {
       const today = new Date();
       
-      const report = medications.map(medication => {
-        const daysUntilExpiry = differenceInDays(
-          new Date(medication.expiryDate),
+      // Only include items with expiry dates
+      const itemsWithExpiry = [
+        ...medications.map(med => ({ ...med, itemType: 'medication' as const })),
+        ...utensils.filter(utensil => utensil.expiryDate).map(utensil => ({ ...utensil, itemType: 'utensil' as const }))
+      ];
+      
+      const report = itemsWithExpiry.map(item => {
+        const daysUntilExpiry = item.expiryDate ? differenceInDays(
+          new Date(item.expiryDate),
           today
-        );
+        ) : 999;
         
         // Get stock for each location
         const locationStocks = locations.map(location => {
           const stockItem = stock.find(
-            item => item.itemId === medication.id && item.itemType === 'medication' && item.locationId === location.id
+            stockItem => stockItem.itemId === item.id && stockItem.itemType === item.itemType && stockItem.locationId === location.id
           );
           return {
             locationId: location.id,
@@ -197,11 +218,12 @@ const Reports = () => {
         }
         
         return {
-          id: medication.id,
-          name: medication.name,
-          manufacturer: medication.manufacturer,
-          batch: medication.batch,
-          expiryDate: medication.expiryDate,
+          id: item.id,
+          name: item.name,
+          manufacturer: item.manufacturer,
+          batch: item.batch,
+          expiryDate: item.expiryDate,
+          itemType: item.itemType,
           daysUntilExpiry,
           status,
           totalStock,
@@ -239,13 +261,27 @@ const Reports = () => {
       
       // Add medication info
       return filteredItems.map(item => {
-        const medication = medications.find(med => med.id === item.itemId);
+        let itemData = null;
+        let itemName = 'Desconhecido';
+        let itemManufacturer = 'Desconhecido';
+        
+        if (item.itemType === 'medication') {
+          itemData = medications.find(med => med.id === item.itemId);
+        } else if (item.itemType === 'utensil') {
+          itemData = utensils.find(utensil => utensil.id === item.itemId);
+        }
+        
+        if (itemData) {
+          itemName = itemData.name;
+          itemManufacturer = itemData.manufacturer;
+        }
+        
         const location = locations.find(loc => loc.id === item.locationId);
         
         return {
           ...item,
-          medicationName: medication ? medication.name : 'Desconhecido',
-          medicationManufacturer: medication ? medication.manufacturer : 'Desconhecido',
+          itemName,
+          itemManufacturer,
           locationName: location ? location.name : 'Desconhecido',
         };
       });
@@ -290,7 +326,8 @@ const Reports = () => {
         tableContent = `
           <thead>
             <tr>
-              <th>Medicamento</th>
+              <th>Tipo</th>
+              <th>Nome</th>
               <th>Fabricante</th>
               <th>Categoria</th>
               <th>Lote</th>
@@ -302,6 +339,7 @@ const Reports = () => {
           <tbody>
             ${currentData.map(item => `
               <tr>
+                <td><span class="badge ${item.itemType === 'medication' ? 'bg-primary-100 text-primary-800' : 'bg-secondary-100 text-secondary-800'}">${item.itemType === 'medication' ? 'Medicamento' : 'Utensílio'}</span></td>
                 <td>${item.name}</td>
                 <td>${item.manufacturer}</td>
                 <td>${item.category}</td>
@@ -322,7 +360,8 @@ const Reports = () => {
         tableContent = `
           <thead>
             <tr>
-              <th>Medicamento</th>
+              <th>Tipo</th>
+              <th>Nome</th>
               <th>Entradas</th>
               <th>Distribuições</th>
               <th>Dispensações</th>
@@ -335,6 +374,7 @@ const Reports = () => {
           <tbody>
             ${currentData.map(item => `
               <tr>
+                <td><span class="badge ${item.itemType === 'medication' ? 'bg-primary-100 text-primary-800' : 'bg-secondary-100 text-secondary-800'}">${item.itemType === 'medication' ? 'Medicamento' : 'Utensílio'}</span></td>
                 <td>${item.name}</td>
                 <td class="positive">${item.receipts}</td>
                 <td>${item.distributions}</td>
@@ -356,7 +396,8 @@ const Reports = () => {
         tableContent = `
           <thead>
             <tr>
-              <th>Medicamento</th>
+              <th>Tipo</th>
+              <th>Nome</th>
               <th>Fabricante</th>
               <th>Lote</th>
               <th>Data de Validade</th>
@@ -368,6 +409,7 @@ const Reports = () => {
           <tbody>
             ${currentData.map(item => `
               <tr>
+                <td><span class="badge ${item.itemType === 'medication' ? 'bg-primary-100 text-primary-800' : 'bg-secondary-100 text-secondary-800'}">${item.itemType === 'medication' ? 'Medicamento' : 'Utensílio'}</span></td>
                 <td>${item.name}</td>
                 <td>${item.manufacturer}</td>
                 <td>${item.batch}</td>
@@ -392,7 +434,8 @@ const Reports = () => {
         tableContent = `
           <thead>
             <tr>
-              <th>Medicamento</th>
+              <th>Tipo</th>
+              <th>Nome</th>
               <th>Fabricante</th>
               <th>Local</th>
               <th>Lote</th>
@@ -404,8 +447,9 @@ const Reports = () => {
           <tbody>
             ${currentData.map(item => `
               <tr>
-                <td>${item.medicationName}</td>
-                <td>${item.medicationManufacturer}</td>
+                <td><span class="badge ${item.itemType === 'medication' ? 'bg-primary-100 text-primary-800' : 'bg-secondary-100 text-secondary-800'}">${item.itemType === 'medication' ? 'Medicamento' : 'Utensílio'}</span></td>
+                <td>${item.itemName}</td>
+                <td>${item.itemManufacturer}</td>
                 <td>${item.locationName}</td>
                 <td>${item.batch}</td>
                 <td class="negative"><strong>${item.quantity}</strong></td>
@@ -790,7 +834,8 @@ const Reports = () => {
             <table className="table">
               <thead className="bg-gray-50">
                 <tr>
-                  <th scope="col">Medicamento</th>
+                  <th scope="col">Tipo</th>
+                  <th scope="col">Nome</th>
                   <th scope="col">Fabricante</th>
                   <th scope="col">Categoria</th>
                   <th scope="col">Lote</th>
@@ -802,6 +847,15 @@ const Reports = () => {
               <tbody>
                 {stockData.map(item => (
                   <tr key={item.id}>
+                    <td>
+                      <span className={`badge ${
+                        item.itemType === 'medication' 
+                          ? 'bg-primary-100 text-primary-800' 
+                          : 'bg-secondary-100 text-secondary-800'
+                      }`}>
+                        {item.itemType === 'medication' ? 'Medicamento' : 'Utensílio'}
+                      </span>
+                    </td>
                     <td className="font-medium">{item.name}</td>
                     <td>{item.manufacturer}</td>
                     <td>{item.category}</td>
@@ -821,7 +875,7 @@ const Reports = () => {
                 ))}
                 {stockData.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="text-center py-4 text-gray-500">
+                    <td colSpan={8} className="text-center py-4 text-gray-500">
                       Nenhum dado disponível para o relatório
                     </td>
                   </tr>
@@ -837,7 +891,8 @@ const Reports = () => {
             <table className="table">
               <thead className="bg-gray-50">
                 <tr>
-                  <th scope="col">Medicamento</th>
+                  <th scope="col">Tipo</th>
+                  <th scope="col">Nome</th>
                   <th scope="col">Entradas</th>
                   <th scope="col">Distribuições</th>
                   <th scope="col">Dispensações</th>
@@ -850,6 +905,15 @@ const Reports = () => {
               <tbody>
                 {movementData.map(item => (
                   <tr key={item.id}>
+                    <td>
+                      <span className={`badge ${
+                        item.itemType === 'medication' 
+                          ? 'bg-primary-100 text-primary-800' 
+                          : 'bg-secondary-100 text-secondary-800'
+                      }`}>
+                        {item.itemType === 'medication' ? 'Medicamento' : 'Utensílio'}
+                      </span>
+                    </td>
                     <td className="font-medium">{item.name}</td>
                     <td className="text-success-600">{item.receipts}</td>
                     <td>{item.distributions}</td>
@@ -880,7 +944,7 @@ const Reports = () => {
                 ))}
                 {movementData.length === 0 && (
                   <tr>
-                    <td colSpan={8} className="text-center py-4 text-gray-500">
+                    <td colSpan={9} className="text-center py-4 text-gray-500">
                       Nenhum dado disponível para o relatório
                     </td>
                   </tr>
@@ -896,7 +960,8 @@ const Reports = () => {
             <table className="table">
               <thead className="bg-gray-50">
                 <tr>
-                  <th scope="col">Medicamento</th>
+                  <th scope="col">Tipo</th>
+                  <th scope="col">Nome</th>
                   <th scope="col">Fabricante</th>
                   <th scope="col">Lote</th>
                   <th scope="col">Data de Validade</th>
@@ -908,6 +973,15 @@ const Reports = () => {
               <tbody>
                 {expiryData.map(item => (
                   <tr key={item.id}>
+                    <td>
+                      <span className={`badge ${
+                        item.itemType === 'medication' 
+                          ? 'bg-primary-100 text-primary-800' 
+                          : 'bg-secondary-100 text-secondary-800'
+                      }`}>
+                        {item.itemType === 'medication' ? 'Medicamento' : 'Utensílio'}
+                      </span>
+                    </td>
                     <td className="font-medium">{item.name}</td>
                     <td>{item.manufacturer}</td>
                     <td>{item.batch}</td>
@@ -941,7 +1015,7 @@ const Reports = () => {
                 ))}
                 {expiryData.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="text-center py-4 text-gray-500">
+                    <td colSpan={8} className="text-center py-4 text-gray-500">
                       Nenhum dado disponível para o relatório
                     </td>
                   </tr>
@@ -957,7 +1031,8 @@ const Reports = () => {
             <table className="table">
               <thead className="bg-gray-50">
                 <tr>
-                  <th scope="col">Medicamento</th>
+                  <th scope="col">Tipo</th>
+                  <th scope="col">Nome</th>
                   <th scope="col">Fabricante</th>
                   <th scope="col">Local</th>
                   <th scope="col">Lote</th>
@@ -969,8 +1044,17 @@ const Reports = () => {
               <tbody>
                 {damagedData.map(item => (
                   <tr key={item.id}>
-                    <td className="font-medium">{item.medicationName}</td>
-                    <td>{item.medicationManufacturer}</td>
+                    <td>
+                      <span className={`badge ${
+                        item.itemType === 'medication' 
+                          ? 'bg-primary-100 text-primary-800' 
+                          : 'bg-secondary-100 text-secondary-800'
+                      }`}>
+                        {item.itemType === 'medication' ? 'Medicamento' : 'Utensílio'}
+                      </span>
+                    </td>
+                    <td className="font-medium">{item.itemName}</td>
+                    <td>{item.itemManufacturer}</td>
                     <td>{item.locationName}</td>
                     <td>{item.batch}</td>
                     <td className="text-danger-600 font-medium">{item.quantity}</td>
@@ -980,7 +1064,7 @@ const Reports = () => {
                 ))}
                 {damagedData.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="text-center py-4 text-gray-500">
+                    <td colSpan={8} className="text-center py-4 text-gray-500">
                       Nenhum dado disponível para o relatório
                     </td>
                   </tr>
