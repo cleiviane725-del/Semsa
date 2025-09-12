@@ -105,6 +105,7 @@ interface MedicationContextType {
   
   reportDamagedItem: (damagedItem: Omit<DamagedItem, 'id' | 'reportDate'>) => string;
   generatePDF: (transactionIds: string[]) => void;
+  setTransactions: React.Dispatch<React.SetStateAction<StockTransaction[]>>;
 }
 
 export const MedicationContext = createContext<MedicationContextType>({
@@ -133,6 +134,7 @@ export const MedicationContext = createContext<MedicationContextType>({
   
   reportDamagedItem: () => '',
   generatePDF: () => {},
+  setTransactions: () => {},
 });
 
 interface MedicationProviderProps {
@@ -664,6 +666,7 @@ export const MedicationProvider = ({ children }: MedicationProviderProps) => {
         
         reportDamagedItem,
         generatePDF,
+        setTransactions,
       }}
     >
       {children}
