@@ -49,6 +49,9 @@ const Dashboard = () => {
       pendingRequests = pendingRequests.filter(
         t => t.sourceLocationId === userUbsId || t.destinationLocationId === userUbsId
       );
+    } else if (user?.role === 'warehouse') {
+      // Warehouse should see approved requests that need processing
+      pendingRequests = transactions.filter(t => t.status === 'approved');
     }
     
     let recentDistributions = transactions.filter(
@@ -330,11 +333,15 @@ const Dashboard = () => {
                     .map(transaction => {
                       let itemName = 'Desconhecido';
                       if (transaction.itemType === 'medication') {
-                        const medication = medications.find(m => m.id === transaction.itemId);
+                        const medication = medications.find(m => m.id === (transaction.itemId || transaction.medicationId));
                         itemName = medication ? medication.name : 'Desconhecido';
                       } else if (transaction.itemType === 'utensil') {
-                        const utensil = utensils.find(u => u.id === transaction.itemId);
+                        const utensil = utensils.find(u => u.id === (transaction.itemId || transaction.medicationId));
                         itemName = utensil ? utensil.name : 'Desconhecido';
+                      } else {
+                        // Fallback for older transactions without itemType
+                        const medication = medications.find(m => m.id === (transaction.itemId || transaction.medicationId));
+                        itemName = medication ? medication.name : 'Desconhecido';
                       }
                       
                       return (

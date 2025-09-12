@@ -32,7 +32,7 @@ const RequestList = () => {
     } else if (user?.role === 'admin') {
       setStatusFilter('pending');
     } else {
-      setStatusFilter('all');
+      setStatusFilter('pending');
     }
   }, [user?.role]);
 
@@ -47,8 +47,8 @@ const RequestList = () => {
         t => t.sourceLocationId === user.ubsId || t.destinationLocationId === user.ubsId
       );
     } else if (user?.role === 'warehouse') {
-      // Warehouse: show all transactions (no location filter)
-      // They need to see all approved requests to process them
+      // Warehouse: show only approved transactions that need processing
+      relevantTransactions = relevantTransactions.filter(t => t.status === 'approved');
     }
 
     // Apply search filter
@@ -177,8 +177,8 @@ const RequestList = () => {
   const handleDeliver = () => {
     if (!selectedTransaction || !user?.id) return;
 
-    // Get medication details
-    const medication = getMedicationById(selectedTransaction.medicationId);
+    // Get medication details - try both itemId and medicationId
+    const medication = getMedicationById(selectedTransaction.itemId || selectedTransaction.medicationId);
     const sourceLocation = selectedTransaction.sourceLocationId 
       ? getLocationById(selectedTransaction.sourceLocationId) 
       : null;
@@ -211,6 +211,11 @@ const RequestList = () => {
     const now = new Date();
     const deliveryDate = now.toLocaleDateString('pt-BR');
     const deliveryTime = now.toLocaleTimeString('pt-BR');
+    
+    // Get medication name properly
+    const medicationName = medication?.name || 'Medicamento não encontrado';
+    const medicationManufacturer = medication?.manufacturer || 'N/A';
+    const medicationBatch = medication?.batch || 'N/A';
     
     // Check if quantity was changed or justification was added
     const hasAdminChanges = transaction.adminJustification || 
@@ -393,9 +398,9 @@ const RequestList = () => {
           </thead>
           <tbody>
             <tr>
-              <td>${medication?.name || 'Desconhecido'}</td>
-              <td>${medication?.manufacturer || 'N/A'}</td>
-              <td>${medication?.batch || 'N/A'}</td>
+              <td>${medicationName}</td>
+              <td>${medicationManufacturer}</td>
+              <td>${medicationBatch}</td>
               <td><strong>${transaction.quantity} unidades</strong></td>
               <td>${transaction.reason}${transaction.adminJustification ? ` (Alterado: ${transaction.adminJustification})` : ''}</td>
             </tr>
@@ -640,7 +645,8 @@ const RequestList = () => {
             </thead>
             <tbody>
               {filteredTransactions.map(transaction => {
-                const medication = getMedicationById(transaction.itemId || transaction.medicationId);
+                // Try to get medication by itemId first, then medicationId
+                const medication = getMedicationById(transaction.itemId) || getMedicationById(transaction.medicationId);
                 const itemName = medication ? medication.name : 'Desconhecido';
                 
                 const sourceLocation = transaction.sourceLocationId 
