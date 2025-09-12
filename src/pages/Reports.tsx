@@ -12,6 +12,7 @@ const Reports = () => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [locationFilter, setLocationFilter] = useState('all');
+  const [itemTypeFilter, setItemTypeFilter] = useState('all');
 
   // Different report data states
   const [stockData, setStockData] = useState<any[]>([]);
@@ -58,10 +59,15 @@ const Reports = () => {
     // Generate stock report data
     const generateStockReport = () => {
       // Combine medications and utensils
-      const allItems = [
+      let allItems = [
         ...medications.map(med => ({ ...med, itemType: 'medication' as const })),
         ...utensils.map(utensil => ({ ...utensil, itemType: 'utensil' as const }))
       ];
+      
+      // Filter by item type
+      if (itemTypeFilter !== 'all') {
+        allItems = allItems.filter(item => item.itemType === itemTypeFilter);
+      }
       
       const report = allItems.map(item => {
         // Get stock for each location
@@ -112,10 +118,15 @@ const Reports = () => {
     // Generate movements report data
     const generateMovementReport = () => {
       // Combine medications and utensils
-      const allItems = [
+      let allItems = [
         ...medications.map(med => ({ ...med, itemType: 'medication' as const })),
         ...utensils.map(utensil => ({ ...utensil, itemType: 'utensil' as const }))
       ];
+      
+      // Filter by item type
+      if (itemTypeFilter !== 'all') {
+        allItems = allItems.filter(item => item.itemType === itemTypeFilter);
+      }
       
       // Filter transactions based on date range
       let filteredTransactions = transactions.filter(t => {
@@ -181,10 +192,15 @@ const Reports = () => {
       const today = new Date();
       
       // Only include items with expiry dates
-      const itemsWithExpiry = [
+      let itemsWithExpiry = [
         ...medications.map(med => ({ ...med, itemType: 'medication' as const })),
         ...utensils.filter(utensil => utensil.expiryDate).map(utensil => ({ ...utensil, itemType: 'utensil' as const }))
       ];
+      
+      // Filter by item type
+      if (itemTypeFilter !== 'all') {
+        itemsWithExpiry = itemsWithExpiry.filter(item => item.itemType === itemTypeFilter);
+      }
       
       const report = itemsWithExpiry.map(item => {
         const daysUntilExpiry = item.expiryDate ? differenceInDays(
@@ -252,6 +268,11 @@ const Reports = () => {
         return isWithinInterval(itemDate, { start, end });
       });
       
+      // Filter by item type
+      if (itemTypeFilter !== 'all') {
+        filteredItems = filteredItems.filter(item => item.itemType === itemTypeFilter);
+      }
+      
       // Filter by location if needed
       if (locationFilter !== 'all') {
         filteredItems = filteredItems.filter(
@@ -302,7 +323,7 @@ const Reports = () => {
         setDamagedData(generateDamagedReport());
         break;
     }
-  }, [medications, locations, stock, transactions, damagedItems, reportType, periodFilter, startDate, endDate, locationFilter]);
+  }, [medications, utensils, locations, stock, transactions, damagedItems, reportType, periodFilter, startDate, endDate, locationFilter, itemTypeFilter]);
 
   // Generate PDF report
   const generatePDFReport = () => {
@@ -602,8 +623,8 @@ const Reports = () => {
             <div><strong>Período:</strong> ${periodText}</div>
             <div><strong>Gerado em:</strong> ${reportDate}</div>
             <div><strong>Administrador:</strong> ${user?.name || 'João Silva'}</div>
+            <div><strong>Tipo de Item:</strong> ${itemTypeFilter === 'all' ? 'Todos os Tipos' : itemTypeFilter === 'medication' ? 'Medicamentos' : 'Utensílios'}</div>
             <div><strong>Total de Registros:</strong> ${currentData.length}</div>
-            <div><strong>Local:</strong> ${locationFilter === 'all' ? 'Todos os Locais' : locations.find(l => l.id === locationFilter)?.name}</div>
           </div>
           ${periodFilter === 'custom' && startDate && endDate ? `
             <div style="margin-top: 15px;">
@@ -750,6 +771,22 @@ const Reports = () => {
               <option value="annual">Relatório Anual</option>
               <option value="monthly">Relatório Mensal</option>
               <option value="custom">Relatório Periódico</option>
+            </select>
+          </div>
+
+          {/* Item Type Filter */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Tipo de Item
+            </label>
+            <select
+              value={itemTypeFilter}
+              onChange={e => setItemTypeFilter(e.target.value)}
+              className="select"
+            >
+              <option value="all">Todos os Tipos</option>
+              <option value="medication">Medicamentos</option>
+              <option value="utensil">Utensílios</option>
             </select>
           </div>
 
