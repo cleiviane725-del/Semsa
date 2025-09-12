@@ -1,14 +1,16 @@
 import { useState, useEffect } from 'react';
-import { FileBadge as FileBar, Download, BarChart, ArrowDown, ArrowUp, AlertTriangle, Package, Calendar } from 'lucide-react';
+import { FileBadge as FileBar, Download, BarChart, ArrowDown, ArrowUp, AlertTriangle, Package, Calendar, Filter } from 'lucide-react';
 import { useMedication } from '../hooks/useMedication';
 import { useAuth } from '../hooks/useAuth';
-import { differenceInDays } from 'date-fns';
+import { differenceInDays, isWithinInterval, startOfYear, endOfYear, startOfMonth, endOfMonth } from 'date-fns';
 
 const Reports = () => {
-  const { medications, locations, stock, transactions, damagedItems } = useMedication();
+  const { medications, utensils, locations, stock, transactions, damagedItems } = useMedication();
   const { user } = useAuth();
   const [reportType, setReportType] = useState('stock');
-  const [period, setPeriod] = useState('30');
+  const [periodFilter, setPeriodFilter] = useState('all');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [locationFilter, setLocationFilter] = useState('all');
 
   // Different report data states
@@ -19,7 +21,40 @@ const Reports = () => {
 
   const [reportDate] = useState<string>(new Date().toLocaleDateString());
 
+  // Get date range based on period filter
+  const getDateRange = () => {
+    const now = new Date();
+    let start: Date, end: Date;
+
+    switch (periodFilter) {
+      case 'annual':
+        start = startOfYear(now);
+        end = endOfYear(now);
+        break;
+      case 'monthly':
+        start = startOfMonth(now);
+        end = endOfMonth(now);
+        break;
+      case 'custom':
+        if (startDate && endDate) {
+          start = new Date(startDate);
+          end = new Date(endDate);
+        } else {
+          start = new Date(0);
+          end = now;
+        }
+        break;
+      default:
+        start = new Date(0);
+        end = now;
+    }
+
+    return { start, end };
+  };
+
   useEffect(() => {
+    const { start, end } = getDateRange();
+
     // Generate stock report data
     const generateStockReport = () => {
       const report = medications.map(medication => {
@@ -69,15 +104,11 @@ const Reports = () => {
     
     // Generate movements report data
     const generateMovementReport = () => {
-      // Get date limit based on period
-      const periodDays = parseInt(period);
-      const dateLimit = new Date();
-      dateLimit.setDate(dateLimit.getDate() - periodDays);
-      
-      // Filter transactions based on period
-      let filteredTransactions = transactions.filter(
-        t => new Date(t.requestDate) >= dateLimit
-      );
+      // Filter transactions based on date range
+      let filteredTransactions = transactions.filter(t => {
+        const transactionDate = new Date(t.requestDate);
+        return isWithinInterval(transactionDate, { start, end });
+      });
       
       // Filter by location if needed
       if (locationFilter !== 'all') {
@@ -193,15 +224,11 @@ const Reports = () => {
     
     // Generate damaged items report data
     const generateDamagedReport = () => {
-      // Get date limit based on period
-      const periodDays = parseInt(period);
-      const dateLimit = new Date();
-      dateLimit.setDate(dateLimit.getDate() - periodDays);
-      
-      // Filter damaged items based on period
-      let filteredItems = damagedItems.filter(
-        item => new Date(item.reportDate) >= dateLimit
-      );
+      // Filter damaged items based on date range
+      let filteredItems = damagedItems.filter(item => {
+        const itemDate = new Date(item.reportDate);
+        return isWithinInterval(itemDate, { start, end });
+      });
       
       // Filter by location if needed
       if (locationFilter !== 'all') {
@@ -212,7 +239,7 @@ const Reports = () => {
       
       // Add medication info
       return filteredItems.map(item => {
-        const medication = medications.find(med => med.id === item.medicationId);
+        const medication = medications.find(med => med.id === item.itemId);
         const location = locations.find(loc => loc.id === item.locationId);
         
         return {
@@ -239,18 +266,375 @@ const Reports = () => {
         setDamagedData(generateDamagedReport());
         break;
     }
-  }, [medications, locations, stock, transactions, damagedItems, reportType, period, locationFilter]);
+  }, [medications, locations, stock, transactions, damagedItems, reportType, periodFilter, startDate, endDate, locationFilter]);
+
+  // Generate PDF report
+  const generatePDFReport = () => {
+    const { start, end } = getDateRange();
+    const periodText = periodFilter === 'annual' ? 'Anual' : 
+                     periodFilter === 'monthly' ? 'Mensal' : 
+                     periodFilter === 'custom' ? 'Periódico' : 'Geral';
+    
+    const reportTitle = reportType === 'stock' ? 'Relatório de Estoque' :
+                       reportType === 'movement' ? 'Relatório de Movimentações' :
+                       reportType === 'expiry' ? 'Relatório de Validades' :
+                       'Relatório de Avarias';
+
+    let tableContent = '';
+    let currentData: any[] = [];
+
+    // Get current data based on report type
+    switch (reportType) {
+      case 'stock':
+        currentData = stockData;
+        tableContent = `
+          <thead>
+            <tr>
+              <th>Medicamento</th>
+              <th>Fabricante</th>
+              <th>Categoria</th>
+              <th>Lote</th>
+              <th>Estoque Total</th>
+              <th>Estoque Mínimo</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${currentData.map(item => `
+              <tr>
+                <td>${item.name}</td>
+                <td>${item.manufacturer}</td>
+                <td>${item.category}</td>
+                <td>${item.batch}</td>
+                <td class="${item.hasLowStock ? 'low-stock' : ''}">${item.totalStock}</td>
+                <td>${item.minimumStock}</td>
+                <td class="${item.hasLowStock ? 'status-warning' : 'status-normal'}">
+                  ${item.hasLowStock ? 'Estoque Baixo' : 'Normal'}
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        `;
+        break;
+
+      case 'movement':
+        currentData = movementData;
+        tableContent = `
+          <thead>
+            <tr>
+              <th>Medicamento</th>
+              <th>Entradas</th>
+              <th>Distribuições</th>
+              <th>Dispensações</th>
+              <th>Avarias</th>
+              <th>Total Entrada</th>
+              <th>Total Saída</th>
+              <th>Saldo</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${currentData.map(item => `
+              <tr>
+                <td>${item.name}</td>
+                <td class="positive">${item.receipts}</td>
+                <td>${item.distributions}</td>
+                <td>${item.patientDistributions}</td>
+                <td class="negative">${item.damaged}</td>
+                <td class="positive"><strong>${item.totalIn}</strong></td>
+                <td class="negative"><strong>${item.totalOut}</strong></td>
+                <td class="${item.balance > 0 ? 'positive' : item.balance < 0 ? 'negative' : ''}">
+                  <strong>${item.balance}</strong>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        `;
+        break;
+
+      case 'expiry':
+        currentData = expiryData;
+        tableContent = `
+          <thead>
+            <tr>
+              <th>Medicamento</th>
+              <th>Fabricante</th>
+              <th>Lote</th>
+              <th>Data de Validade</th>
+              <th>Dias Restantes</th>
+              <th>Estoque</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${currentData.map(item => `
+              <tr>
+                <td>${item.name}</td>
+                <td>${item.manufacturer}</td>
+                <td>${item.batch}</td>
+                <td>${new Date(item.expiryDate).toLocaleDateString()}</td>
+                <td class="${item.status === 'expired' ? 'expired' : item.status === 'warning' ? 'warning' : ''}">
+                  ${item.daysUntilExpiry < 0 ? 'Vencido' : `${item.daysUntilExpiry} dias`}
+                </td>
+                <td>${item.totalStock}</td>
+                <td class="status-${item.status}">
+                  ${item.status === 'expired' ? 'Vencido' : 
+                    item.status === 'warning' ? 'Atenção' : 
+                    item.status === 'attention' ? 'Monitorar' : 'Normal'}
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        `;
+        break;
+
+      case 'damaged':
+        currentData = damagedData;
+        tableContent = `
+          <thead>
+            <tr>
+              <th>Medicamento</th>
+              <th>Fabricante</th>
+              <th>Local</th>
+              <th>Lote</th>
+              <th>Quantidade</th>
+              <th>Motivo</th>
+              <th>Data</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${currentData.map(item => `
+              <tr>
+                <td>${item.medicationName}</td>
+                <td>${item.medicationManufacturer}</td>
+                <td>${item.locationName}</td>
+                <td>${item.batch}</td>
+                <td class="negative"><strong>${item.quantity}</strong></td>
+                <td>${item.reason}</td>
+                <td>${new Date(item.reportDate).toLocaleDateString()}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        `;
+        break;
+    }
+
+    const pdfContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>${reportTitle} - SemsaControl</title>
+        <style>
+          body { 
+            font-family: Arial, sans-serif; 
+            margin: 20px; 
+            line-height: 1.6;
+            color: #333;
+          }
+          .header { 
+            text-align: center; 
+            margin-bottom: 40px; 
+            border-bottom: 2px solid #0891b2;
+            padding-bottom: 20px;
+          }
+          .header h1 { 
+            color: #0891b2; 
+            margin: 0; 
+            font-size: 28px;
+          }
+          .header p { 
+            margin: 5px 0; 
+            color: #666; 
+            font-size: 16px;
+          }
+          .report-info {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid #0891b2;
+          }
+          .report-info h3 {
+            color: #0891b2;
+            margin-top: 0;
+          }
+          .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 20px;
+            margin: 15px 0;
+          }
+          .info-item strong {
+            color: #0891b2;
+          }
+          table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            margin: 20px 0;
+            background: white;
+            font-size: 12px;
+          }
+          th, td { 
+            border: 1px solid #ddd; 
+            padding: 8px; 
+            text-align: left; 
+          }
+          th { 
+            background-color: #0891b2; 
+            color: white;
+            font-weight: bold;
+            font-size: 11px;
+          }
+          tr:nth-child(even) {
+            background-color: #f8f9fa;
+          }
+          .low-stock, .negative {
+            color: #dc2626;
+            font-weight: bold;
+          }
+          .positive {
+            color: #16a34a;
+            font-weight: bold;
+          }
+          .expired {
+            color: #dc2626;
+            font-weight: bold;
+          }
+          .warning {
+            color: #d97706;
+            font-weight: bold;
+          }
+          .status-expired {
+            background-color: #fef2f2;
+            color: #dc2626;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+          }
+          .status-warning {
+            background-color: #fffbeb;
+            color: #d97706;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+          }
+          .status-normal {
+            background-color: #f0fdf4;
+            color: #16a34a;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+          }
+          .footer {
+            margin-top: 40px;
+            text-align: center;
+            font-size: 12px;
+            color: #666;
+            border-top: 1px solid #ddd;
+            padding-top: 20px;
+          }
+          .summary {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+          }
+          .summary h4 {
+            color: #1976d2;
+            margin-top: 0;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>SemsaControl</h1>
+          <p>Sistema de Controle de Medicamentos</p>
+          <p><strong>${reportTitle} - ${periodText}</strong></p>
+        </div>
+        
+        <div class="report-info">
+          <h3>📊 Informações do Relatório</h3>
+          <div class="info-grid">
+            <div><strong>Tipo:</strong> ${reportTitle}</div>
+            <div><strong>Período:</strong> ${periodText}</div>
+            <div><strong>Gerado em:</strong> ${reportDate}</div>
+            <div><strong>Administrador:</strong> ${user?.name || 'João Silva'}</div>
+            <div><strong>Total de Registros:</strong> ${currentData.length}</div>
+            <div><strong>Local:</strong> ${locationFilter === 'all' ? 'Todos os Locais' : locations.find(l => l.id === locationFilter)?.name}</div>
+          </div>
+          ${periodFilter === 'custom' && startDate && endDate ? `
+            <div style="margin-top: 15px;">
+              <strong>Período Personalizado:</strong> ${new Date(startDate).toLocaleDateString()} até ${new Date(endDate).toLocaleDateString()}
+            </div>
+          ` : ''}
+        </div>
+
+        ${currentData.length > 0 ? `
+          <div class="summary">
+            <h4>📈 Resumo Executivo</h4>
+            ${reportType === 'stock' ? `
+              <p><strong>Itens com Estoque Baixo:</strong> ${currentData.filter(item => item.hasLowStock).length}</p>
+              <p><strong>Total de Medicamentos:</strong> ${currentData.length}</p>
+            ` : reportType === 'movement' ? `
+              <p><strong>Total de Entradas:</strong> ${currentData.reduce((sum, item) => sum + item.totalIn, 0)}</p>
+              <p><strong>Total de Saídas:</strong> ${currentData.reduce((sum, item) => sum + item.totalOut, 0)}</p>
+              <p><strong>Saldo Geral:</strong> ${currentData.reduce((sum, item) => sum + item.balance, 0)}</p>
+            ` : reportType === 'expiry' ? `
+              <p><strong>Medicamentos Vencidos:</strong> ${currentData.filter(item => item.status === 'expired').length}</p>
+              <p><strong>Próximos ao Vencimento:</strong> ${currentData.filter(item => item.status === 'warning').length}</p>
+            ` : `
+              <p><strong>Total de Avarias:</strong> ${currentData.reduce((sum, item) => sum + item.quantity, 0)} unidades</p>
+              <p><strong>Itens Avariados:</strong> ${currentData.length}</p>
+            `}
+          </div>
+        ` : ''}
+        
+        <table>
+          ${tableContent}
+        </table>
+        
+        ${currentData.length === 0 ? `
+          <div style="text-align: center; padding: 40px; color: #666;">
+            <h3>📋 Nenhum Dado Encontrado</h3>
+            <p>Não há dados disponíveis para o período e filtros selecionados.</p>
+          </div>
+        ` : ''}
+        
+        <div class="footer">
+          <p><strong>SemsaControl v1.0</strong> - Sistema de Controle de Medicamentos</p>
+          <p>Relatório gerado em: ${new Date().toLocaleString()}</p>
+          <p>Este documento foi gerado automaticamente pelo sistema SemsaControl</p>
+        </div>
+      </body>
+      </html>
+    `;
+    
+    // Open PDF in new window for download
+    const newWindow = window.open('', '_blank');
+    if (newWindow) {
+      newWindow.document.write(pdfContent);
+      newWindow.document.close();
+      
+      // Trigger print dialog which allows saving as PDF
+      setTimeout(() => {
+        newWindow.print();
+      }, 500);
+    }
+  };
 
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Relatórios</h1>
-        <button className="btn-primary flex items-center gap-2">
+        <button 
+          onClick={generatePDFReport}
+          className="btn-primary flex items-center gap-2"
+        >
           <Download size={18} />
           <span>Exportar PDF</span>
         </button>
       </div>
 
+      {/* Report Type Selection */}
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="flex-1 grid grid-cols-2 md:grid-cols-4 gap-4">
           <button
@@ -300,35 +684,80 @@ const Reports = () => {
         </div>
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-4 pb-2">
-        <div className="flex-1">
-          <select
-            value={locationFilter}
-            onChange={e => setLocationFilter(e.target.value)}
-            className="select"
-          >
-            <option value="all">Todos os Locais</option>
-            {locations.map(location => (
-              <option key={location.id} value={location.id}>
-                {location.name}
-              </option>
-            ))}
-          </select>
+      {/* Filters */}
+      <div className="card">
+        <div className="flex items-center gap-2 mb-4">
+          <Filter size={20} className="text-primary-600" />
+          <h3 className="text-lg font-semibold">Filtros do Relatório</h3>
         </div>
-        {(reportType === 'movement' || reportType === 'damaged') && (
-          <div className="flex-1">
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Period Filter */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Período
+            </label>
             <select
-              value={period}
-              onChange={e => setPeriod(e.target.value)}
+              value={periodFilter}
+              onChange={e => setPeriodFilter(e.target.value)}
               className="select"
             >
-              <option value="7">Últimos 7 dias</option>
-              <option value="30">Últimos 30 dias</option>
-              <option value="90">Últimos 90 dias</option>
-              <option value="365">Último ano</option>
+              <option value="all">Todos os Períodos</option>
+              <option value="annual">Relatório Anual</option>
+              <option value="monthly">Relatório Mensal</option>
+              <option value="custom">Relatório Periódico</option>
             </select>
           </div>
-        )}
+
+          {/* Location Filter */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Local
+            </label>
+            <select
+              value={locationFilter}
+              onChange={e => setLocationFilter(e.target.value)}
+              className="select"
+            >
+              <option value="all">Todos os Locais</option>
+              {locations.map(location => (
+                <option key={location.id} value={location.id}>
+                  {location.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Start Date - Only show for custom period */}
+          {periodFilter === 'custom' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Data de Início
+              </label>
+              <input
+                type="date"
+                value={startDate}
+                onChange={e => setStartDate(e.target.value)}
+                className="input"
+              />
+            </div>
+          )}
+
+          {/* End Date - Only show for custom period */}
+          {periodFilter === 'custom' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Data de Fim
+              </label>
+              <input
+                type="date"
+                value={endDate}
+                onChange={e => setEndDate(e.target.value)}
+                className="input"
+              />
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="card">
@@ -345,7 +774,14 @@ const Reports = () => {
                 : 'Relatório de Avarias'}
             </span>
           </h2>
-          <span className="text-sm text-gray-500">Gerado em: {reportDate}</span>
+          <div className="text-sm text-gray-500">
+            <span>Gerado em: {reportDate}</span>
+            {periodFilter === 'custom' && startDate && endDate && (
+              <span className="ml-4">
+                Período: {new Date(startDate).toLocaleDateString()} - {new Date(endDate).toLocaleDateString()}
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Stock Report */}
