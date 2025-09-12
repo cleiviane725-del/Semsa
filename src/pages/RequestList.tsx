@@ -18,6 +18,12 @@ const RequestList = () => {
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [bulkRequest, setBulkRequest] = useState<{[key: string]: {quantity: number, reason: string}}>({});
   const [previewItems, setPreviewItems] = useState<any[]>([]);
+  
+  // New states for editing requests
+  const [editedQuantity, setEditedQuantity] = useState<number>(0);
+  const [adminJustification, setAdminJustification] = useState<string>('');
+  const [warehouseStock, setWarehouseStock] = useState<number>(0);
+  const [ubsStock, setUbsStock] = useState<number>(0);
 
   // Set initial status filter based on user role
   useEffect(() => {
@@ -78,17 +84,62 @@ const RequestList = () => {
 
   const handleTransactionSelect = (transaction: any) => {
     setSelectedTransaction(transaction);
+    setEditedQuantity(transaction.quantity);
+    setAdminJustification('');
+    
+    // Calculate stock levels
+    const warehouseStockItem = stock.find(
+      item => item.itemId === (transaction.itemId || transaction.medicationId) && 
+               item.itemType === (transaction.itemType || 'medication') && 
+               item.locationId === 'warehouse1'
+    );
+    setWarehouseStock(warehouseStockItem ? warehouseStockItem.quantity : 0);
+    
+    const ubsStockItem = stock.find(
+      item => item.itemId === (transaction.itemId || transaction.medicationId) && 
+               item.itemType === (transaction.itemType || 'medication') && 
+               item.locationId === transaction.destinationLocationId
+    );
+    setUbsStock(ubsStockItem ? ubsStockItem.quantity : 0);
+    
     setShowModal(true);
   };
 
   const handleApprove = () => {
     if (selectedTransaction && user?.id) {
+      // Update transaction with edited values if changed
+      const updatedTransaction = {
+        ...selectedTransaction,
+        quantity: editedQuantity,
+        adminJustification: adminJustification.trim() || undefined
+      };
+      
+      // Update the transaction in the context
+      setTransactions(prev => 
+        prev.map(t => 
+          t.id === selectedTransaction.id 
+            ? updatedTransaction
+            : t
+        )
+      );
+      
       updateTransactionStatus(selectedTransaction.id, 'approved', user.id);
+      
+      const quantityChanged = editedQuantity !== selectedTransaction.quantity;
+      const hasJustification = adminJustification.trim().length > 0;
+      
+      let message = 'A solicitação foi aprovada e enviada para o almoxarifado para liberação.';
+      if (quantityChanged) {
+        message += ` Quantidade alterada de ${selectedTransaction.quantity} para ${editedQuantity}.`;
+      }
+      if (hasJustification) {
+        message += ` Justificativa: ${adminJustification}`;
+      }
       
       addNotification({
         type: 'success',
         title: 'Solicitação Aprovada',
-        message: `A solicitação foi aprovada e enviada para o almoxarifado para liberação.`,
+        message,
       });
       
       setShowModal(false);
@@ -160,6 +211,10 @@ const RequestList = () => {
     const now = new Date();
     const deliveryDate = now.toLocaleDateString('pt-BR');
     const deliveryTime = now.toLocaleTimeString('pt-BR');
+    
+    // Check if quantity was changed or justification was added
+    const hasAdminChanges = transaction.adminJustification || 
+      (transaction.originalQuantity && transaction.originalQuantity !== transaction.quantity);
     
     // Create PDF content
     const pdfContent = `
@@ -313,6 +368,19 @@ const RequestList = () => {
           <div class="info-item"><strong>Data da Entrega:</strong> ${deliveryDate} às ${deliveryTime}</div>
         </div>
         
+        ${hasAdminChanges ? `
+          <div class="info-section">
+            <h3>📝 Alterações do Administrador</h3>
+            ${transaction.originalQuantity && transaction.originalQuantity !== transaction.quantity ? `
+              <div class="info-item"><strong>Quantidade Original:</strong> ${transaction.originalQuantity}</div>
+              <div class="info-item"><strong>Quantidade Aprovada:</strong> ${transaction.quantity}</div>
+            ` : ''}
+            ${transaction.adminJustification ? `
+              <div class="info-item"><strong>Justificativa:</strong> ${transaction.adminJustification}</div>
+            ` : ''}
+          </div>
+        ` : ''}
+        
         <table>
           <thead>
             <tr>
@@ -329,7 +397,7 @@ const RequestList = () => {
               <td>${medication?.manufacturer || 'N/A'}</td>
               <td>${medication?.batch || 'N/A'}</td>
               <td><strong>${transaction.quantity} unidades</strong></td>
-              <td>${transaction.reason}</td>
+              <td>${transaction.reason}${transaction.adminJustification ? ` (Alterado: ${transaction.adminJustification})` : ''}</td>
             </tr>
           </tbody>
         </table>
@@ -644,7 +712,7 @@ const RequestList = () => {
       {/* Request Detail Modal */}
       {showModal && selectedTransaction && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 animate-fade-in">
-          <div className="bg-white rounded-lg shadow-xl max-w-lg mx-auto p-6 w-full">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl mx-auto p-6 w-full max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-xl font-bold">Detalhes da Solicitação</h3>
               <button
@@ -656,6 +724,79 @@ const RequestList = () => {
             </div>
 
             <div className="space-y-4">
+              {/* Stock Information Section */}
+              <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                <h4 className="font-semibold text-blue-800 mb-3 flex items-center gap-2">
+                  <Package size={18} />
+                  Informações de Estoque
+                </h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-white p-3 rounded border">
+                    <p className="text-sm text-gray-500">Almoxarifado Central</p>
+                    <p className={`text-lg font-bold ${
+                      warehouseStock >= editedQuantity ? 'text-green-600' : 'text-red-600'
+                    }`}>
+                      {warehouseStock} unidades
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      {warehouseStock >= editedQuantity ? '✅ Suficiente' : '❌ Insuficiente'}
+                    </p>
+                  </div>
+                  <div className="bg-white p-3 rounded border">
+                    <p className="text-sm text-gray-500">
+                      {getLocationById(selectedTransaction.destinationLocationId)?.name || 'UBS'}
+                    </p>
+                    <p className="text-lg font-bold text-blue-600">
+                      {ubsStock} unidades
+                    </p>
+                    <p className="text-xs text-gray-400">Estoque atual</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Editable Quantity Section - Only for Admin and Pending status */}
+              {user?.role === 'admin' && selectedTransaction.status === 'pending' && (
+                <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+                  <h4 className="font-semibold text-yellow-800 mb-3">Ajustar Solicitação</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Quantidade Solicitada
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-gray-500">Original:</span>
+                        <span className="font-medium">{selectedTransaction.quantity}</span>
+                        <span className="text-sm text-gray-500">→</span>
+                        <input
+                          type="number"
+                          min="1"
+                          max={warehouseStock}
+                          value={editedQuantity}
+                          onChange={(e) => setEditedQuantity(parseInt(e.target.value) || 0)}
+                          className="input w-24"
+                        />
+                      </div>
+                      {editedQuantity !== selectedTransaction.quantity && (
+                        <p className="text-xs text-yellow-600 mt-1">
+                          Quantidade será alterada de {selectedTransaction.quantity} para {editedQuantity}
+                        </p>
+                      )}
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Justificativa da Alteração (opcional)
+                      </label>
+                      <textarea
+                        value={adminJustification}
+                        onChange={(e) => setAdminJustification(e.target.value)}
+                        className="input h-20 resize-none"
+                        placeholder="Ex: Estoque insuficiente, ajuste conforme disponibilidade..."
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-gray-500">Tipo</p>
@@ -665,18 +806,22 @@ const RequestList = () => {
                   <p className="text-sm text-gray-500">Item</p>
                   <p className="font-medium">
                     {getMedicationById(selectedTransaction.medicationId)?.name || 'Desconhecido'}
-                  </p>
+                     getUtensilById(selectedTransaction.itemId || selectedTransaction.medicationId)?.name || 'Desconhecido'}
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-gray-500">Quantidade</p>
-                  <p className="font-medium">{selectedTransaction.quantity}</p>
+                  <p className="font-medium">
+                    {user?.role === 'admin' && selectedTransaction.status === 'pending' 
+                      ? editedQuantity 
+                      : selectedTransaction.quantity}
+                  </p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">Tipo</p>
-                  <p className="font-medium">Medicamento</p>
+                  <p className="font-medium">{selectedTransaction.itemType === 'utensil' ? 'Utensílio' : 'Medicamento'}</p>
                 </div>
               </div>
 

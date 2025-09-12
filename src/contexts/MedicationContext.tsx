@@ -55,9 +55,11 @@ export interface StockTransaction {
   itemId?: string;
   itemType?: 'medication' | 'utensil';
   quantity: number;
+  originalQuantity?: number;
   reason: string;
   patientId?: string;
   patientName?: string;
+  adminJustification?: string;
   status: 'pending' | 'approved' | 'rejected' | 'completed';
   requestedBy: string;
   processedBy?: string;
@@ -446,7 +448,8 @@ export const MedicationProvider = ({ children }: MedicationProviderProps) => {
   const updateTransactionStatus = (
     id: string, 
     status: 'approved' | 'rejected' | 'completed',
-    processedBy: string
+    processedBy: string,
+    updatedData?: Partial<StockTransaction>
   ): void => {
     const transaction = transactions.find(t => t.id === id);
     if (!transaction) return;
@@ -457,7 +460,14 @@ export const MedicationProvider = ({ children }: MedicationProviderProps) => {
     setTransactions(prev => 
       prev.map(t => 
         t.id === id 
-          ? { ...t, status, processedBy, processDate: now } 
+          ? { 
+              ...t, 
+              ...updatedData,
+              status, 
+              processedBy, 
+              processDate: now,
+              originalQuantity: updatedData?.quantity && updatedData.quantity !== t.quantity ? t.quantity : t.originalQuantity
+            } 
           : t
       )
     );
