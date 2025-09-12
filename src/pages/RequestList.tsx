@@ -708,6 +708,13 @@ const RequestList = () => {
                     ? 'Aprovado'
                     : selectedTransaction.status === 'completed'
                     ? 'Concluído'
+                    : 'Rejeitado'}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-sm text-gray-500">Item</p>
+                <p className="font-medium">
                   {getMedicationById(selectedTransaction.itemId || selectedTransaction.medicationId)?.name || 'Desconhecido'}
                 </p>
               </div>
