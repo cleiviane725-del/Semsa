@@ -24,7 +24,7 @@ const DistributionList = () => {
     // Apply search filter
     if (searchTerm) {
       distributionTransactions = distributionTransactions.filter(t => {
-        const medication = getMedicationById(t.medicationId);
+        const medication = getMedicationById(t.itemId || t.medicationId);
         const sourceName = t.sourceLocationId ? getLocationById(t.sourceLocationId)?.name : '';
         const destinationName = t.destinationLocationId ? getLocationById(t.destinationLocationId)?.name : '';
         
@@ -102,7 +102,7 @@ const DistributionList = () => {
             </thead>
             <tbody>
               {filteredTransactions.map(transaction => {
-                const medication = getMedicationById(transaction.medicationId);
+                const medication = getMedicationById(transaction.itemId || transaction.medicationId);
                 const sourceLocation = transaction.sourceLocationId 
                   ? getLocationById(transaction.sourceLocationId) 
                   : null;

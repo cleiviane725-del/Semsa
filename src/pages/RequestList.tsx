@@ -48,7 +48,7 @@ const RequestList = () => {
     // Apply search filter
     if (searchTerm) {
       relevantTransactions = relevantTransactions.filter(t => {
-        const medication = getMedicationById(t.medicationId);
+        const medication = getMedicationById(t.itemId || t.medicationId);
         const itemName = medication ? medication.name : '';
         
         const sourceName = t.sourceLocationId ? getLocationById(t.sourceLocationId)?.name : '';
@@ -572,7 +572,7 @@ const RequestList = () => {
             </thead>
             <tbody>
               {filteredTransactions.map(transaction => {
-                const medication = getMedicationById(transaction.medicationId);
+                const medication = getMedicationById(transaction.itemId || transaction.medicationId);
                 const itemName = medication ? medication.name : 'Desconhecido';
                 
                 const sourceLocation = transaction.sourceLocationId 
@@ -708,7 +708,7 @@ const RequestList = () => {
                     ? 'Aprovado'
                     : selectedTransaction.status === 'completed'
                     ? 'Concluído'
-                    : 'Rejeitado'}
+                  {getMedicationById(selectedTransaction.itemId || selectedTransaction.medicationId)?.name || 'Desconhecido'}
                 </p>
               </div>
 

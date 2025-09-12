@@ -61,7 +61,7 @@ const Reports = () => {
         // Get stock for each location
         const locationStocks = locations.map(location => {
           const stockItem = stock.find(
-            item => item.medicationId === medication.id && item.locationId === location.id
+            item => item.itemId === medication.id && item.itemType === 'medication' && item.locationId === location.id
           );
           return {
             locationId: location.id,
@@ -120,7 +120,7 @@ const Reports = () => {
       // Group by medication and calculate totals
       const medicationMovements = medications.map(medication => {
         const medicationTransactions = filteredTransactions.filter(
-          t => t.medicationId === medication.id
+          t => (t.itemId || t.medicationId) === medication.id
         );
         
         const receipts = medicationTransactions
@@ -174,7 +174,7 @@ const Reports = () => {
         // Get stock for each location
         const locationStocks = locations.map(location => {
           const stockItem = stock.find(
-            item => item.medicationId === medication.id && item.locationId === location.id
+            item => item.itemId === medication.id && item.itemType === 'medication' && item.locationId === location.id
           );
           return {
             locationId: location.id,
