@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
-import { ClipboardList, Search, Filter, Check, X, Info, Download, Plus } from 'lucide-react';
+import { ClipboardList, Search, Filter, Check, X, Info, Download, Plus, Package } from 'lucide-react';
 import { useMedication } from '../hooks/useMedication';
 import { useAuth } from '../hooks/useAuth';
 import { useNotification } from '../hooks/useNotification';
 
 const RequestList = () => {
-  const { medications, utensils, locations, transactions, getMedicationById, getUtensilById, getLocationById, updateTransactionStatus, generatePDF } = useMedication();
+  const { medications, utensils, locations, transactions, stock, getMedicationById, getUtensilById, getLocationById, updateTransactionStatus, generatePDF, addStockTransaction, setTransactions } = useMedication();
   const { user } = useAuth();
   const { addNotification } = useNotification();
   const [searchTerm, setSearchTerm] = useState('');
@@ -805,8 +805,9 @@ const RequestList = () => {
                 <div>
                   <p className="text-sm text-gray-500">Item</p>
                   <p className="font-medium">
-                    {getMedicationById(selectedTransaction.medicationId)?.name || 'Desconhecido'}
+                    {getMedicationById(selectedTransaction.medicationId)?.name || 
                      getUtensilById(selectedTransaction.itemId || selectedTransaction.medicationId)?.name || 'Desconhecido'}
+                  </p>
                 </div>
               </div>
 
